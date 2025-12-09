@@ -1,0 +1,26 @@
+{
+  "name": "com.unitymvc.core",
+  "displayName": "UnityMVC",
+  "description": "Lightweight Unity MVC backbone: views auto-wire controllers/models via attributes and expose DI plus an event bus with lifetime-aware cancellation—minimal boilerplate for UI and gameplay logic.\n\nRecommendation: install together with VContainer to access all features; see https://vcontainer.hadashikick.jp/getting-started/installation",
+  "version": "0.1.0",
+  "unity": "2023.1",
+  "keywords": ["mvc", "architecture", "framework", "unity"],
+  "author": {
+    "name": "josemgmz",
+    "url": "https://github.com/josemgmz/"
+  },
+  "documentationUrl": "https://github.com/josemgmz/unity-mvc",
+  "changelogUrl": "https://github.com/josemgmz/unity-mvc/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/josemgmz/unity-mvc/blob/main/LICENSE",
+  "license": "Unlicense",
+  "dependencies": {
+    "com.unity.addressables": "2.1.0"
+  },
+  "samples": [
+    {
+      "displayName": "UnityMVC Example",
+      "description": "Example usage of UnityMVC in several scenarios.",
+      "path": "Samples~/Example"
+    }
+  ]
+}

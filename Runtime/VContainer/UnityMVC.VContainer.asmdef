@@ -1,0 +1,24 @@
+{
+    "name": "UnityMVC.VContainer",
+    "rootNamespace": "UnityMVC",
+    "references": [
+        "VContainer"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UNITYMVC_VCONTAINER"
+    ],
+    "versionDefines": [
+        {
+            "name": "jp.hadashikick.vcontainer",
+            "expression": "1.0.0",
+            "define": "UNITYMVC_VCONTAINER"
+        }
+    ],
+    "noEngineReferences": false
+}
