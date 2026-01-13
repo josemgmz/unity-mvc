@@ -263,6 +263,7 @@ namespace UnityMVC
                 fields.AddRange(currentType.GetFields(BINDING_FLAGS));
                 currentType = currentType.BaseType;
             }
+            fields.Reverse();
                 
             fields.ForEach(field =>
             {
