@@ -63,5 +63,12 @@ namespace UnityMVC
         /// </summary>
         [AttributeUsage(AttributeTargets.Field)]
         public class ModelFieldAttribute : System.Attribute {}
+
+        /// <summary>
+        /// Attribute to indicate that controller fields should be processed in reverse order.
+        /// If at least one controller field has this attribute, all fields will be reversed before processing.
+        /// </summary>
+        [AttributeUsage(AttributeTargets.Field)]
+        public class ControllerReverseOrderAttribute : System.Attribute {}
     }
 }
