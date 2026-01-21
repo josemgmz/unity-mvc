@@ -263,7 +263,16 @@ namespace UnityMVC
                 fields.AddRange(currentType.GetFields(BINDING_FLAGS));
                 currentType = currentType.BaseType;
             }
-            fields.Reverse();
+            
+            // Check if any field has the reverse order attribute
+            var shouldReverse = fields.Any(field =>
+                field.GetCustomAttributes(typeof(GameFieldAttributes.ControllerReverseOrderAttribute), false).Length > 0
+            );
+            
+            if (!shouldReverse)
+            {
+                fields.Reverse();
+            }
                 
             fields.ForEach(field =>
             {
