@@ -4,6 +4,9 @@
     "references": [
         "Unity.Addressables",
         "Unity.ResourceManager",
+        "UnityEngine.PhysicsModule",
+        "UnityEngine.Physics2DModule",
+        "UnityEngine.UI",
         "UnityMVC.VContainer",
         "VContainer"
     ],
