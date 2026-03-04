@@ -34,6 +34,7 @@ namespace UnityMVC
         private const string DESTROY_METHOD = "Destroy";
         private bool _awakeWasCalled = false;
         private const BindingFlags BINDING_FLAGS = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+        private static readonly GameMethodEvents[] GAME_METHOD_EVENTS = (GameMethodEvents[])Enum.GetValues(typeof(GameMethodEvents));
 
         #endregion
 
@@ -179,13 +180,13 @@ namespace UnityMVC
             {
                 _rawModels = new Dictionary<Type, object>();
                 InitializeModelByType(GetType());
-                _rawModels.ToList().ForEach(it =>
+                foreach (var modelEntry in _rawModels)
                 {
-                    modelType = it.Key;
-                    var currentValue = ((GameModel)it.Value);
-                    var callAwake = it.Key.GetMethod(AWAKE_METHOD, BINDING_FLAGS)!.MakeGenericMethod(it.Key);
+                    modelType = modelEntry.Key;
+                    var currentValue = (GameModel)modelEntry.Value;
+                    var callAwake = modelEntry.Key.GetMethod(AWAKE_METHOD, BINDING_FLAGS)!.MakeGenericMethod(modelEntry.Key);
                     callAwake?.Invoke(currentValue, null);
-                });
+                }
                 _modelsInitialized = true;
             }
             catch (Exception e)
@@ -197,27 +198,27 @@ namespace UnityMVC
 
         private void InitializeModelByType(Type value)
         {
-            var fields = new List<FieldInfo>();
             var currentType = value;
             while (currentType != null)
             {
-                fields.AddRange(currentType.GetFields(BINDING_FLAGS));
+                var fields = currentType.GetFields(BINDING_FLAGS);
+                for (var index = 0; index < fields.Length; index++)
+                {
+                    var field = fields[index];
+                    var attributes = field.GetCustomAttributes(typeof(GameFieldAttributes.ModelFieldAttribute), false);
+                    if (attributes.Length <= 0) continue;
+                    var modelType = field.FieldType;
+                    var modelValue = field.GetValue(this);
+                    if (modelValue == null)
+                    {
+                        modelValue = Activator.CreateInstance(modelType);
+                        field.SetValue(this, modelValue);
+                    }
+                    _rawModels.Add(modelType, modelValue);
+                }
+
                 currentType = currentType.BaseType;
             }
-            
-            fields.ForEach(field =>
-            {
-                var attributes = field.GetCustomAttributes(typeof(GameFieldAttributes.ModelFieldAttribute), false);
-                if (attributes.Length <= 0) return;
-                var modelType = field.FieldType;
-                var modelValue = field.GetValue(this);
-                if (modelValue == null)
-                {
-                    modelValue = Activator.CreateInstance(modelType);
-                    field.SetValue(this, modelValue);
-                }
-                _rawModels.Add(modelType, modelValue);
-            });
         }
 
         private bool ShouldInstantiateController(GameFieldAttributes.ControllerExecutionMode executionMode, bool allowEditor)
@@ -265,17 +266,24 @@ namespace UnityMVC
             }
             
             // Check if any field has the reverse order attribute
-            var shouldReverse = fields.Any(field =>
-                field.GetCustomAttributes(typeof(GameFieldAttributes.ControllerReverseOrderAttribute), false).Length > 0
-            );
+            var shouldReverse = false;
+            for (var index = 0; index < fields.Count; index++)
+            {
+                if (fields[index].GetCustomAttributes(typeof(GameFieldAttributes.ControllerReverseOrderAttribute), false).Length > 0)
+                {
+                    shouldReverse = true;
+                    break;
+                }
+            }
             
             if (!shouldReverse)
             {
                 fields.Reverse();
             }
                 
-            fields.ForEach(field =>
+            for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
             {
+                var field = fields[fieldIndex];
                 var attributes = field.GetCustomAttributes(typeof(GameFieldAttributes.ControllerFieldAttribute), false);
                 if (attributes.Length > 0)
                 {
@@ -303,7 +311,7 @@ namespace UnityMVC
                     }
                     _rawControllers.Add(controllerType, controllerInstance);
                 }
-            });
+            }
             
             // Wire up each controller
             foreach (var it in _rawControllers.Values)
@@ -345,21 +353,19 @@ namespace UnityMVC
             }
 
             // Gather all event methods to bind
-            var methodsToBindToController =
-                Enum.GetValues(typeof(GameMethodEvents)).Cast<GameMethodEvents>().ToList();
-            
             // Bind controller methods to GameMethodEvents
             foreach (var it in _rawControllers.Values)
             {
-                methodsToBindToController.ForEach(methodToBind =>
+                for (var eventIndex = 0; eventIndex < GAME_METHOD_EVENTS.Length; eventIndex++)
                 {
+                    var methodToBind = GAME_METHOD_EVENTS[eventIndex];
                     var newMethod = it.GetType().GetMethod(methodToBind.ToString(), BINDING_FLAGS);
                     if (newMethod != null)
                     {
                         var cachedMethod = GameMethod.Create(it, newMethod);
                         _gameMethods.AddMethod(methodToBind, cachedMethod);
                     }
-                });
+                }
             }
             
             // PreAwake on controllers
@@ -653,12 +659,15 @@ namespace UnityMVC
         private void OnDestroy()
         {
             InvokeGameMethods(GameMethodEvents.OnDestroy);
-            _rawModels?.ToList().ForEach(it =>
+            if (_rawModels != null)
             {
-                var currentValue = ((GameModel)it.Value);
-                var callAwake = it.Key.GetMethod(DESTROY_METHOD, BINDING_FLAGS)?.MakeGenericMethod(it.Key);
-                callAwake?.Invoke(currentValue, null);
-            });
+                foreach (var modelEntry in _rawModels)
+                {
+                    var currentValue = (GameModel)modelEntry.Value;
+                    var callAwake = modelEntry.Key.GetMethod(DESTROY_METHOD, BINDING_FLAGS)?.MakeGenericMethod(modelEntry.Key);
+                    callAwake?.Invoke(currentValue, null);
+                }
+            }
             _cancellationToken.Cancel();
         }
 

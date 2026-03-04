@@ -1,4 +1,3 @@
-using System.Linq;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEngine.SceneManagement;
@@ -44,8 +43,10 @@ namespace UnityMVC.Editor
                     var views = root.GetComponentsInChildren<GameView>(true);
                     if (views == null || views.Length == 0) continue;
 
-                    foreach (var view in views.Where(v => v != null))
+                    for (var index = 0; index < views.Length; index++)
                     {
+                        var view = views[index];
+                        if (view == null) continue;
                         view.EditorReinitialize();
                     }
                 }
