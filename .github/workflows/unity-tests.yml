@@ -10,9 +10,15 @@ on:
 
 jobs:
   test:
-    name: EditMode + PlayMode
+    name: ${{ matrix.testMode }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        testMode:
+          - editmode
+          - playmode
 
     steps:
       - name: Checkout
@@ -46,13 +52,15 @@ jobs:
           packageMode: true
           projectPath: ci/package
           unityVersion: 6000.3.8f1
-          testMode: all
+          testMode: ${{ matrix.testMode }}
           githubToken: ${{ secrets.GITHUB_TOKEN }}
-          artifactsPath: artifacts
+          checkName: "${{ matrix.testMode }} Test Results"
+          coverageOptions: ""
+          artifactsPath: "artifacts-${{ matrix.testMode }}"
 
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unity-test-results
+          name: unity-test-results-${{ matrix.testMode }}
           path: ${{ steps.unity-tests.outputs.artifactsPath }}
