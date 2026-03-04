@@ -20,6 +20,20 @@ jobs:
         with:
           lfs: true
 
+      - name: Prepare package directory for GameCI package mode
+        run: |
+          mkdir -p ci/package
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.idea/' \
+            --exclude 'ci/' \
+            --exclude 'ValidationProject~/' \
+            --exclude 'TestResults~/' \
+            --exclude 'TempProject/' \
+            --exclude 'artifacts/' \
+            ./ ci/package/
+
       - name: Run Unity tests
         id: unity-tests
         uses: game-ci/unity-test-runner@v4
@@ -30,7 +44,7 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           packageMode: true
-          projectPath: .
+          projectPath: ci/package
           unityVersion: 6000.3.8f1
           testMode: all
           githubToken: ${{ secrets.GITHUB_TOKEN }}

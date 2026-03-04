@@ -14,7 +14,8 @@
   "licensesUrl": "https://github.com/josemgmz/unity-mvc/blob/main/LICENSE",
   "license": "Unlicense",
   "dependencies": {
-    "com.unity.addressables": "2.1.0"
+    "com.unity.addressables": "2.1.0",
+    "com.unity.ugui": "2.0.0"
   },
   "samples": [
     {
