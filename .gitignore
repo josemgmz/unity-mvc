@@ -1,1 +1,11 @@
 .idea/
+
+# Local Unity test harness artifacts
+/ValidationProject/
+/ValidationProject.meta
+/ValidationProject~/
+/TestResults/
+/TestResults.meta
+/TestResults~/
+/temp-activator.cs
+/temp-activator.cs.meta

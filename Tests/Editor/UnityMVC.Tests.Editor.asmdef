@@ -1,0 +1,24 @@
+{
+    "name": "UnityMVC.Tests.Editor",
+    "rootNamespace": "UnityMVC.Tests.Editor",
+    "references": [
+        "UnityMVC",
+        "UnityEngine.PhysicsModule",
+        "UnityEngine.Physics2DModule",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "noEngineReferences": false
+}
