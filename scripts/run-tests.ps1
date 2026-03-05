@@ -3,11 +3,43 @@ param(
     [string]$Platform = "all",
     [string]$UnityPath,
     [string]$UnityVersion,
+    [bool]$KillStaleUnityProcesses = $true,
     [string]$ProjectPath = (Join-Path (Join-Path $PSScriptRoot "..") "ValidationProject~\RunnerProject"),
     [string]$ResultsDir
 )
 
 $ErrorActionPreference = "Stop"
+
+function Stop-StaleUnityProcesses {
+    param([bool]$Enabled)
+
+    if (-not $Enabled) {
+        return
+    }
+
+    $targetProcessNames = @(
+        "Unity",
+        "UnityPackageManager",
+        "Unity.Licensing.Client",
+        "UnityCrashHandler64",
+        "UnityShaderCompiler"
+    )
+
+    $running = Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $targetProcessNames -contains $_.ProcessName }
+
+    if (-not $running) {
+        return
+    }
+
+    Write-Host "Stopping stale Unity processes before test execution..."
+    $running | Select-Object ProcessName, Id | ForEach-Object {
+        Write-Host " - $($_.ProcessName) [$($_.Id)]"
+    }
+
+    $running | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+}
 
 function Resolve-UnityPath {
     param([string]$ConfiguredPath)
@@ -200,6 +232,7 @@ $resolvedUnityPath = Resolve-UnityPath -ConfiguredPath $UnityPath
 $resolvedUnityVersion = Resolve-UnityVersion -ConfiguredVersion $UnityVersion -ResolvedUnityPath $resolvedUnityPath
 $resolvedPackagePath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $resolvedProjectPath = [System.IO.Path]::GetFullPath($ProjectPath)
+Stop-StaleUnityProcesses -Enabled $KillStaleUnityProcesses
 $resolvedResultsDir = Resolve-ResultsDirectory `
     -ConfiguredResultsDir $ResultsDir `
     -ResolvedPackagePath $resolvedPackagePath `
