@@ -414,6 +414,37 @@ namespace UnityMVC
             }
             throw new Exception($"Model not found for type {type}");
         }
+
+        /// <summary>
+        /// Attempts to resolve a model clone matching <typeparamref name="T"/> (exact type first, then assignable types).
+        /// </summary>
+        public bool TryGetModel<T>(out T model) where T : GameModel
+        {
+            var targetType = typeof(T);
+            if (_rawModels == null || _rawModels.Count == 0)
+            {
+                model = default!;
+                return false;
+            }
+
+            if (_rawModels.TryGetValue(targetType, out var rawModel) && rawModel is GameModel exactModel)
+            {
+                model = (T)exactModel.Clone();
+                return true;
+            }
+
+            foreach (var kvp in _rawModels)
+            {
+                if (targetType.IsAssignableFrom(kvp.Key) && kvp.Value is GameModel assignableModel)
+                {
+                    model = (T)assignableModel.Clone();
+                    return true;
+                }
+            }
+
+            model = default!;
+            return false;
+        }
         
         /// <summary>
         /// Returns a controller instance of type <typeparamref name="T"/> (exact match or assignable).

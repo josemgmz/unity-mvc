@@ -325,7 +325,18 @@ namespace UnityMVC
             for (var i = 0; i < childCount; i++)
             {
                 var child = transform.GetChild(i);
-                models.Add(GetModelFromOtherObject<TModelType>(child.gameObject));
+                var childGameObject = child.gameObject;
+                if (!childGameObject.TryGetComponent(out GameView viewComponent))
+                {
+                    continue;
+                }
+
+                if (!viewComponent.TryGetModel<TModelType>(out var childModel))
+                {
+                    continue;
+                }
+
+                models.Add(childModel);
             }
             return models;
         }
