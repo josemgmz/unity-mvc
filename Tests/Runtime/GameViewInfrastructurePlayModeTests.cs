@@ -28,6 +28,8 @@ namespace UnityMVC.Tests.Runtime
             PlayModeLifecycleController.ModelAndGetModelShareReference = false;
             PlayModeLifecycleController.ViewCloneHasExpectedValue = false;
             PlayModeLifecycleController.ViewCloneDiffersFromInjectedModel = false;
+            PlayModeLifecycleController.LastUpdateFrame = -1;
+            PlayModeLifecycleController.UpdateBeforeLateUpdateInSameFrame = false;
             PlayModeLifecycleController.Log = new List<string>();
 
             PlayModeControllerSurfaceController.GameObjectMatchesView = false;
@@ -40,6 +42,13 @@ namespace UnityMVC.Tests.Runtime
             PlayModeControllerSurfaceController.ActiveSelfAfterDisable = false;
             PlayModeControllerSurfaceController.ActiveSelfAfterEnable = false;
             PlayModeControllerSurfaceController.TempObjects = new List<GameObject>();
+
+            PlayModeCollisionController.EnterCalls = 0;
+            PlayModeCollisionController.StayCalls = 0;
+            PlayModeCollisionController.ExitCalls = 0;
+            PlayModeCollisionController.DestroyRequestedOnEnter = false;
+            PlayModeCollisionController.DestroyedObjectName = null;
+            PlayModeCollisionController.DestroyOnEnterEnabled = false;
         }
 
         [UnityTest]
@@ -66,33 +75,90 @@ namespace UnityMVC.Tests.Runtime
         }
 
         [UnityTest]
-        public IEnumerator PlayModeLifecycleInvokesCoreLoopAndOnDestroyInExpectedOrder()
+        public IEnumerator PlayModeLifecycleAwakeIsInvokedOnce()
         {
-            var gameObject = new GameObject("playmode-lifecycle");
-            var view = gameObject.AddComponent<PlayModeLifecycleView>();
+            var gameObject = CreateLifecycleGameObject("playmode-awake");
 
-            yield return new WaitForFixedUpdate();
-            yield return null;
             yield return null;
 
             Assert.That(PlayModeLifecycleModel.AwakeCalls, Is.EqualTo(1));
             Assert.That(PlayModeLifecycleController.AwakeCalls, Is.EqualTo(1));
-            Assert.That(PlayModeLifecycleController.OnEnableCalls, Is.GreaterThanOrEqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeLifecycleStartIsInvokedOnce()
+        {
+            var gameObject = CreateLifecycleGameObject("playmode-start");
+
+            yield return WaitForCondition(
+                () => PlayModeLifecycleController.StartCalls == 1,
+                20,
+                "Start was not triggered exactly once in time.");
+
             Assert.That(PlayModeLifecycleController.StartCalls, Is.EqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeLifecycleUpdateIsInvoked()
+        {
+            var gameObject = CreateLifecycleGameObject("playmode-update");
+
+            yield return WaitForCondition(
+                () => PlayModeLifecycleController.UpdateCalls > 0,
+                20,
+                "Update was not triggered in time.");
+
             Assert.That(PlayModeLifecycleController.UpdateCalls, Is.GreaterThanOrEqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeLifecycleLateUpdateIsInvoked()
+        {
+            var gameObject = CreateLifecycleGameObject("playmode-lateupdate");
+
+            yield return WaitForCondition(
+                () => PlayModeLifecycleController.LateUpdateCalls > 0,
+                20,
+                "LateUpdate was not triggered in time.");
+
             Assert.That(PlayModeLifecycleController.LateUpdateCalls, Is.GreaterThanOrEqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeLifecycleFixedUpdateIsInvoked()
+        {
+            var gameObject = CreateLifecycleGameObject("playmode-fixedupdate");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeLifecycleController.FixedUpdateCalls > 0,
+                30,
+                "FixedUpdate was not triggered in time.");
+
             Assert.That(PlayModeLifecycleController.FixedUpdateCalls, Is.GreaterThanOrEqualTo(1));
 
-            var awakeIndex = PlayModeLifecycleController.Log.IndexOf("Awake");
-            var onEnableIndex = PlayModeLifecycleController.Log.IndexOf("OnEnable");
-            var startIndex = PlayModeLifecycleController.Log.IndexOf("Start");
-            var updateIndex = PlayModeLifecycleController.Log.IndexOf("Update");
-            var lateUpdateIndex = PlayModeLifecycleController.Log.IndexOf("LateUpdate");
-            Assert.That(awakeIndex, Is.GreaterThanOrEqualTo(0));
-            Assert.That(onEnableIndex, Is.GreaterThan(awakeIndex));
-            Assert.That(startIndex, Is.GreaterThan(onEnableIndex));
-            Assert.That(updateIndex, Is.GreaterThan(startIndex));
-            Assert.That(lateUpdateIndex, Is.GreaterThan(startIndex));
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeLifecycleOnDestroyIsInvokedAndCancelsToken()
+        {
+            var gameObject = new GameObject("playmode-ondestroy");
+            var view = gameObject.AddComponent<PlayModeLifecycleView>();
+
+            yield return null;
 
             var token = view.GetCancellationToken();
             Assert.That(token.IsCancellationRequested, Is.False);
@@ -103,6 +169,44 @@ namespace UnityMVC.Tests.Runtime
             Assert.That(PlayModeLifecycleController.OnDestroyCalls, Is.EqualTo(1));
             Assert.That(PlayModeLifecycleModel.DestroyCalls, Is.EqualTo(1));
             Assert.That(token.IsCancellationRequested, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeLifecycleOrderAwakeThenOnEnableThenStart()
+        {
+            var gameObject = CreateLifecycleGameObject("playmode-lifecycle-order-boot");
+
+            yield return WaitForCondition(
+                () => PlayModeLifecycleController.StartCalls == 1,
+                20,
+                "Start was not triggered in time for order validation.");
+
+            var awakeIndex = PlayModeLifecycleController.Log.IndexOf("Awake");
+            var onEnableIndex = PlayModeLifecycleController.Log.IndexOf("OnEnable");
+            var startIndex = PlayModeLifecycleController.Log.IndexOf("Start");
+
+            Assert.That(awakeIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(onEnableIndex, Is.GreaterThan(awakeIndex));
+            Assert.That(startIndex, Is.GreaterThan(onEnableIndex));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeLifecycleOrderUpdateBeforeLateUpdate()
+        {
+            var gameObject = CreateLifecycleGameObject("playmode-lifecycle-order-loop");
+
+            yield return WaitForCondition(
+                () => PlayModeLifecycleController.UpdateBeforeLateUpdateInSameFrame,
+                20,
+                "Update/LateUpdate were not triggered in time for order validation.");
+
+            Assert.That(PlayModeLifecycleController.UpdateBeforeLateUpdateInSameFrame, Is.True);
+
+            Object.Destroy(gameObject);
+            yield return null;
         }
 
         [UnityTest]
@@ -185,27 +289,156 @@ namespace UnityMVC.Tests.Runtime
         }
 
         [UnityTest]
-        public IEnumerator PlayModeInvokesOnEnableAndOnDisableWhenActiveStateChanges()
+        public IEnumerator PlayModeOnDisableIsInvokedWhenViewIsSetInactive()
         {
-            var gameObject = new GameObject("playmode-enable-disable");
-            gameObject.AddComponent<PlayModeLifecycleView>();
+            var gameObject = CreateLifecycleGameObject("playmode-ondisable");
 
             yield return null;
 
-            var initialEnableCalls = PlayModeLifecycleController.OnEnableCalls;
             var initialDisableCalls = PlayModeLifecycleController.OnDisableCalls;
-
             gameObject.SetActive(false);
             yield return null;
 
             Assert.That(PlayModeLifecycleController.OnDisableCalls, Is.EqualTo(initialDisableCalls + 1));
 
+            if (gameObject != null)
+            {
+                Object.Destroy(gameObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnEnableIsInvokedWhenViewIsReactivated()
+        {
+            var gameObject = CreateLifecycleGameObject("playmode-onenable");
+
+            yield return null;
+
+            gameObject.SetActive(false);
+            yield return null;
+
+            var initialEnableCalls = PlayModeLifecycleController.OnEnableCalls;
             gameObject.SetActive(true);
             yield return null;
 
             Assert.That(PlayModeLifecycleController.OnEnableCalls, Is.EqualTo(initialEnableCalls + 1));
 
             Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeCollisionEnterIsInvokedAndCanDestroyFloorOnEnter()
+        {
+            PlayModeCollisionController.DestroyOnEnterEnabled = true;
+            CreateCollisionScene(
+                "collision-enter",
+                out var floor,
+                out var fallingObject,
+                out _,
+                out _);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollisionController.EnterCalls > 0,
+                120,
+                "OnCollisionEnter was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => floor == null,
+                120,
+                "Floor was not destroyed from OnCollisionEnter in time.");
+
+            Assert.That(PlayModeCollisionController.DestroyRequestedOnEnter, Is.True);
+            Assert.That(PlayModeCollisionController.DestroyedObjectName, Is.EqualTo("collision-enter-floor"));
+            Assert.That(PlayModeCollisionController.EnterCalls, Is.GreaterThanOrEqualTo(1));
+            Assert.That(floor == null, Is.True);
+
+            if (fallingObject != null)
+            {
+                Object.Destroy(fallingObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeCollisionStayIsInvokedWhileBodiesRemainInContact()
+        {
+            CreateCollisionScene(
+                "collision-stay",
+                out var floor,
+                out var fallingObject,
+                out _,
+                out _);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollisionController.EnterCalls > 0,
+                120,
+                "OnCollisionEnter was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollisionController.StayCalls > 0,
+                120,
+                "OnCollisionStay was not triggered in time.");
+
+            Assert.That(PlayModeCollisionController.StayCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (fallingObject != null)
+            {
+                Object.Destroy(fallingObject);
+            }
+
+            if (floor != null)
+            {
+                Object.Destroy(floor);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeCollisionExitIsInvokedWhenCollisionPairIsRemoved()
+        {
+            CreateCollisionScene(
+                "collision-exit",
+                out var floor,
+                out var fallingObject,
+                out var floorCollider,
+                out var fallingCollider);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollisionController.EnterCalls > 0,
+                120,
+                "OnCollisionEnter was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollisionController.StayCalls > 0,
+                120,
+                "OnCollisionStay was not triggered in time.");
+
+            Assert.That(floorCollider, Is.Not.Null);
+            Assert.That(fallingCollider, Is.Not.Null);
+            Physics.IgnoreCollision(fallingCollider, floorCollider, true);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollisionController.ExitCalls > 0,
+                120,
+                "OnCollisionExit was not triggered in time.");
+
+            Assert.That(PlayModeCollisionController.ExitCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (fallingObject != null)
+            {
+                Object.Destroy(fallingObject);
+            }
+
+            if (floor != null)
+            {
+                Object.Destroy(floor);
+            }
+
             yield return null;
         }
 
@@ -274,6 +507,12 @@ namespace UnityMVC.Tests.Runtime
             [GameFieldAttributes.ControllerField] private PlayModeSurfaceSecondaryController secondaryController;
         }
 
+        public class PlayModeCollisionView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeCollisionModel model;
+            [GameFieldAttributes.ControllerField] private PlayModeCollisionController collisionController;
+        }
+
         public class PlayModeSurfaceMarker : MonoBehaviour
         {
         }
@@ -282,6 +521,65 @@ namespace UnityMVC.Tests.Runtime
         {
             public PlayModeSurfaceSecondaryController()
             {
+            }
+        }
+
+        [System.Serializable]
+        public class PlayModeCollisionModel : GameModel
+        {
+        }
+
+        public class PlayModeCollisionController : GameController<PlayModeCollisionView, PlayModeCollisionModel>
+        {
+            public static int EnterCalls;
+            public static int StayCalls;
+            public static int ExitCalls;
+            public static bool DestroyRequestedOnEnter;
+            public static string DestroyedObjectName;
+            public static bool DestroyOnEnterEnabled;
+
+            private void OnCollisionEnter(Collision other)
+            {
+                EnterCalls++;
+                if (DestroyOnEnterEnabled && other != null && other.gameObject != null)
+                {
+                    DestroyRequestedOnEnter = true;
+                    DestroyedObjectName = other.gameObject.name;
+                    StartCoroutine(DestroyAfterFixedSteps(other.gameObject, 2));
+                }
+            }
+
+            private void OnCollisionStay(Collision other)
+            {
+                StayCalls++;
+            }
+
+            private void OnCollisionExit(Collision other)
+            {
+                ExitCalls++;
+            }
+
+            private IEnumerator DestroyAfterFixedSteps(GameObject value, int stepsToWait)
+            {
+                var safeStepsToWait = Mathf.Max(1, stepsToWait);
+                for (var index = 0; index < safeStepsToWait; index++)
+                {
+                    yield return new WaitForFixedUpdate();
+                }
+
+                // Force a deterministic separation pair removal so OnCollisionExit is raised.
+                var selfCollider = GetComponent<Collider>();
+                var otherCollider = value != null ? value.GetComponent<Collider>() : null;
+                if (selfCollider != null && otherCollider != null)
+                {
+                    Physics.IgnoreCollision(selfCollider, otherCollider, true);
+                    yield return new WaitForFixedUpdate();
+                }
+
+                if (value != null)
+                {
+                    Destroy(value);
+                }
             }
         }
 
@@ -357,6 +655,8 @@ namespace UnityMVC.Tests.Runtime
             public static bool ModelAndGetModelShareReference;
             public static bool ViewCloneHasExpectedValue;
             public static bool ViewCloneDiffersFromInjectedModel;
+            public static int LastUpdateFrame;
+            public static bool UpdateBeforeLateUpdateInSameFrame;
             public static List<string> Log;
 
             private void Awake()
@@ -385,6 +685,7 @@ namespace UnityMVC.Tests.Runtime
             private void Update()
             {
                 UpdateCalls++;
+                LastUpdateFrame = Time.frameCount;
                 if (UpdateCalls == 1)
                 {
                     Log?.Add("Update");
@@ -394,6 +695,11 @@ namespace UnityMVC.Tests.Runtime
             private void LateUpdate()
             {
                 LateUpdateCalls++;
+                if (LastUpdateFrame == Time.frameCount)
+                {
+                    UpdateBeforeLateUpdateInSameFrame = true;
+                }
+
                 if (LateUpdateCalls == 1)
                 {
                     Log?.Add("LateUpdate");
@@ -426,6 +732,65 @@ namespace UnityMVC.Tests.Runtime
                 OnDisableCalls++;
                 Log?.Add("OnDisable");
             }
+        }
+
+        private static GameObject CreateLifecycleGameObject(string name)
+        {
+            var gameObject = new GameObject(name);
+            gameObject.AddComponent<PlayModeLifecycleView>();
+            return gameObject;
+        }
+
+        private static void CreateCollisionScene(
+            string testName,
+            out GameObject floor,
+            out GameObject fallingObject,
+            out Collider floorCollider,
+            out Collider fallingCollider)
+        {
+            floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            floor.name = $"{testName}-floor";
+            floor.transform.position = Vector3.zero;
+            floor.transform.localScale = new Vector3(2f, 1f, 2f);
+
+            fallingObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            fallingObject.name = $"{testName}-view";
+            fallingObject.transform.position = new Vector3(0f, 1.5f, 0f);
+            fallingObject.AddComponent<Rigidbody>();
+            fallingObject.AddComponent<PlayModeCollisionView>();
+
+            floorCollider = floor.GetComponent<Collider>();
+            fallingCollider = fallingObject.GetComponent<Collider>();
+        }
+
+        private static IEnumerator WaitForCondition(System.Func<bool> condition, int maxFrames, string failureMessage)
+        {
+            for (var index = 0; index < maxFrames; index++)
+            {
+                if (condition())
+                {
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            Assert.Fail(failureMessage);
+        }
+
+        private static IEnumerator WaitForFixedCondition(System.Func<bool> condition, int maxFixedSteps, string failureMessage)
+        {
+            for (var index = 0; index < maxFixedSteps; index++)
+            {
+                if (condition())
+                {
+                    yield break;
+                }
+
+                yield return new WaitForFixedUpdate();
+            }
+
+            Assert.Fail(failureMessage);
         }
     }
 }
