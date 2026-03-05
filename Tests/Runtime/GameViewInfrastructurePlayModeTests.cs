@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.TestTools;
 
 namespace UnityMVC.Tests.Runtime
@@ -61,6 +63,28 @@ namespace UnityMVC.Tests.Runtime
             PlayModeTrigger2DController.EnterCalls = 0;
             PlayModeTrigger2DController.StayCalls = 0;
             PlayModeTrigger2DController.ExitCalls = 0;
+
+            PlayModeRenderEventController.AnimatorEventCalls = 0;
+            PlayModeRenderEventController.BecameInvisibleCalls = 0;
+            PlayModeRenderEventController.ParticleSystemStoppedCalls = 0;
+            PlayModeRenderEventController.DrawGizmosCalls = 0;
+            PlayModeRenderEventController.DrawGizmosSelectedCalls = 0;
+            PlayModeRenderEventController.LastAnimatorEventValue = null;
+
+            PlayModeMouseEventController.MouseDownCalls = 0;
+            PlayModeMouseEventController.MouseEnterCalls = 0;
+            PlayModeMouseEventController.MouseExitCalls = 0;
+
+            PlayModeUIEventController.BeginDragCalls = 0;
+            PlayModeUIEventController.DragCalls = 0;
+            PlayModeUIEventController.EndDragCalls = 0;
+            PlayModeUIEventController.PointerDownCalls = 0;
+            PlayModeUIEventController.PointerExitCalls = 0;
+            PlayModeUIEventController.PointerUpCalls = 0;
+            PlayModeUIEventController.PointerMoveCalls = 0;
+            PlayModeUIEventController.PointerEnterCalls = 0;
+            PlayModeUIEventController.SelectCalls = 0;
+            PlayModeUIEventController.DeselectCalls = 0;
         }
 
         [UnityTest]
@@ -781,6 +805,327 @@ namespace UnityMVC.Tests.Runtime
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator PlayModeOnAnimatorEventIsForwardedToController()
+        {
+            var gameObject = new GameObject("playmode-render-onanimatorevent");
+            var view = gameObject.AddComponent<PlayModeRenderEventView>();
+            yield return null;
+
+            InvokeNonPublicGameViewMethod(view, "OnAnimatorEvent", "anim-event-value");
+
+            Assert.That(PlayModeRenderEventController.AnimatorEventCalls, Is.EqualTo(1));
+            Assert.That(PlayModeRenderEventController.LastAnimatorEventValue, Is.EqualTo("anim-event-value"));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnBecameInvisibleIsForwardedToController()
+        {
+            var gameObject = new GameObject("playmode-render-onbecameinvisible");
+            var view = gameObject.AddComponent<PlayModeRenderEventView>();
+            yield return null;
+
+            InvokeNonPublicGameViewMethod(view, "OnBecameInvisible");
+
+            Assert.That(PlayModeRenderEventController.BecameInvisibleCalls, Is.EqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnParticleSystemStoppedIsForwardedToController()
+        {
+            var gameObject = new GameObject("playmode-render-onparticlestopped");
+            var view = gameObject.AddComponent<PlayModeRenderEventView>();
+            yield return null;
+
+            InvokeNonPublicGameViewMethod(view, "OnParticleSystemStopped");
+
+            Assert.That(PlayModeRenderEventController.ParticleSystemStoppedCalls, Is.EqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnDrawGizmosIsForwardedToController()
+        {
+            var gameObject = new GameObject("playmode-render-ondrawgizmos");
+            var view = gameObject.AddComponent<PlayModeRenderEventView>();
+            yield return null;
+
+            InvokeNonPublicGameViewMethod(view, "OnDrawGizmos");
+
+            Assert.That(PlayModeRenderEventController.DrawGizmosCalls, Is.EqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnDrawGizmosSelectedIsForwardedToController()
+        {
+            var gameObject = new GameObject("playmode-render-ondrawgizmosselected");
+            var view = gameObject.AddComponent<PlayModeRenderEventView>();
+            yield return null;
+
+            InvokeNonPublicGameViewMethod(view, "OnDrawGizmosSelected");
+
+            Assert.That(PlayModeRenderEventController.DrawGizmosSelectedCalls, Is.EqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnMouseDownIsForwardedToController()
+        {
+            var gameObject = new GameObject("playmode-mouse-onmousedown");
+            var view = gameObject.AddComponent<PlayModeMouseEventView>();
+            yield return null;
+
+            InvokeNonPublicGameViewMethod(view, "OnMouseDown");
+
+            Assert.That(PlayModeMouseEventController.MouseDownCalls, Is.EqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnMouseEnterIsForwardedToController()
+        {
+            var gameObject = new GameObject("playmode-mouse-onmouseenter");
+            var view = gameObject.AddComponent<PlayModeMouseEventView>();
+            yield return null;
+
+            InvokeNonPublicGameViewMethod(view, "OnMouseEnter");
+
+            Assert.That(PlayModeMouseEventController.MouseEnterCalls, Is.EqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnMouseExitIsForwardedToController()
+        {
+            var gameObject = new GameObject("playmode-mouse-onmouseexit");
+            var view = gameObject.AddComponent<PlayModeMouseEventView>();
+            yield return null;
+
+            InvokeNonPublicGameViewMethod(view, "OnMouseExit");
+
+            Assert.That(PlayModeMouseEventController.MouseExitCalls, Is.EqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnBeginDragIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-onbegindrag",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem);
+            view.OnBeginDrag(pointerEventData);
+
+            Assert.That(PlayModeUIEventController.BeginDragCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnDragIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-ondrag",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem);
+            view.OnDrag(pointerEventData);
+
+            Assert.That(PlayModeUIEventController.DragCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnEndDragIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-onenddrag",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem);
+            view.OnEndDrag(pointerEventData);
+
+            Assert.That(PlayModeUIEventController.EndDragCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnPointerDownIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-onpointerdown",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem);
+            view.OnPointerDown(pointerEventData);
+
+            Assert.That(PlayModeUIEventController.PointerDownCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnPointerExitIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-onpointerexit",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem);
+            view.OnPointerExit(pointerEventData);
+
+            Assert.That(PlayModeUIEventController.PointerExitCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnPointerUpIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-onpointerup",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem);
+            view.OnPointerUp(pointerEventData);
+
+            Assert.That(PlayModeUIEventController.PointerUpCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnPointerMoveIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-onpointermove",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem);
+            view.OnPointerMove(pointerEventData);
+
+            Assert.That(PlayModeUIEventController.PointerMoveCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnPointerEnterIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-onpointerenter",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem);
+            view.OnPointerEnter(pointerEventData);
+
+            Assert.That(PlayModeUIEventController.PointerEnterCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnSelectIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-onselect",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var eventData = new BaseEventData(eventSystem);
+            view.OnSelect(eventData);
+
+            Assert.That(PlayModeUIEventController.SelectCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeOnDeselectIsForwardedToController()
+        {
+            CreateUiEventScene(
+                "playmode-ui-ondeselect",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var eventData = new BaseEventData(eventSystem);
+            view.OnDeselect(eventData);
+
+            Assert.That(PlayModeUIEventController.DeselectCalls, Is.EqualTo(1));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
         [System.Serializable]
         public class PlayModeModel : GameModel
         {
@@ -870,6 +1215,24 @@ namespace UnityMVC.Tests.Runtime
             [GameFieldAttributes.ControllerField] private PlayModeTrigger2DController triggerController;
         }
 
+        public class PlayModeRenderEventView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeRenderEventModel model;
+            [GameFieldAttributes.ControllerField] private PlayModeRenderEventController renderEventController;
+        }
+
+        public class PlayModeMouseEventView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeMouseEventModel model;
+            [GameFieldAttributes.ControllerField] private PlayModeMouseEventController mouseEventController;
+        }
+
+        public class PlayModeUIEventView : GameViewUI
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeUIEventModel model;
+            [GameFieldAttributes.ControllerField] private PlayModeUIEventController uiEventController;
+        }
+
         public class PlayModeSurfaceMarker : MonoBehaviour
         {
         }
@@ -898,6 +1261,21 @@ namespace UnityMVC.Tests.Runtime
 
         [System.Serializable]
         public class PlayModeTrigger2DModel : GameModel
+        {
+        }
+
+        [System.Serializable]
+        public class PlayModeRenderEventModel : GameModel
+        {
+        }
+
+        [System.Serializable]
+        public class PlayModeMouseEventModel : GameModel
+        {
+        }
+
+        [System.Serializable]
+        public class PlayModeUIEventModel : GameModel
         {
         }
 
@@ -1018,6 +1396,128 @@ namespace UnityMVC.Tests.Runtime
             private void OnTriggerExit2D(Collider2D other)
             {
                 ExitCalls++;
+            }
+        }
+
+        public class PlayModeRenderEventController : GameController<PlayModeRenderEventView, PlayModeRenderEventModel>
+        {
+            public static int AnimatorEventCalls;
+            public static int BecameInvisibleCalls;
+            public static int ParticleSystemStoppedCalls;
+            public static int DrawGizmosCalls;
+            public static int DrawGizmosSelectedCalls;
+            public static string LastAnimatorEventValue;
+
+            private void OnAnimatorEvent(string value)
+            {
+                AnimatorEventCalls++;
+                LastAnimatorEventValue = value;
+            }
+
+            private void OnBecameInvisible()
+            {
+                BecameInvisibleCalls++;
+            }
+
+            private void OnParticleSystemStopped()
+            {
+                ParticleSystemStoppedCalls++;
+            }
+
+            private void OnDrawGizmos()
+            {
+                DrawGizmosCalls++;
+            }
+
+            private void OnDrawGizmosSelected()
+            {
+                DrawGizmosSelectedCalls++;
+            }
+        }
+
+        public class PlayModeMouseEventController : GameController<PlayModeMouseEventView, PlayModeMouseEventModel>
+        {
+            public static int MouseDownCalls;
+            public static int MouseEnterCalls;
+            public static int MouseExitCalls;
+
+            private void OnMouseDown()
+            {
+                MouseDownCalls++;
+            }
+
+            private void OnMouseEnter()
+            {
+                MouseEnterCalls++;
+            }
+
+            private void OnMouseExit()
+            {
+                MouseExitCalls++;
+            }
+        }
+
+        public class PlayModeUIEventController : GameController<PlayModeUIEventView, PlayModeUIEventModel>
+        {
+            public static int BeginDragCalls;
+            public static int DragCalls;
+            public static int EndDragCalls;
+            public static int PointerDownCalls;
+            public static int PointerExitCalls;
+            public static int PointerUpCalls;
+            public static int PointerMoveCalls;
+            public static int PointerEnterCalls;
+            public static int SelectCalls;
+            public static int DeselectCalls;
+
+            private void OnBeginDrag(PointerEventData other)
+            {
+                BeginDragCalls++;
+            }
+
+            private void OnDrag(PointerEventData other)
+            {
+                DragCalls++;
+            }
+
+            private void OnEndDrag(PointerEventData other)
+            {
+                EndDragCalls++;
+            }
+
+            private void OnPointerDown(PointerEventData other)
+            {
+                PointerDownCalls++;
+            }
+
+            private void OnPointerExit(PointerEventData other)
+            {
+                PointerExitCalls++;
+            }
+
+            private void OnPointerUp(PointerEventData other)
+            {
+                PointerUpCalls++;
+            }
+
+            private void OnPointerMove(PointerEventData other)
+            {
+                PointerMoveCalls++;
+            }
+
+            private void OnPointerEnter(PointerEventData other)
+            {
+                PointerEnterCalls++;
+            }
+
+            private void OnSelect(BaseEventData eventData)
+            {
+                SelectCalls++;
+            }
+
+            private void OnDeselect(BaseEventData eventData)
+            {
+                DeselectCalls++;
             }
         }
 
@@ -1267,6 +1767,28 @@ namespace UnityMVC.Tests.Runtime
             var rigidbody = movingObject.AddComponent<Rigidbody2D>();
             rigidbody.gravityScale = 4f;
             movingObject.AddComponent<PlayModeTrigger2DView>();
+        }
+
+        private static void CreateUiEventScene(
+            string testName,
+            out GameObject eventSystemObject,
+            out EventSystem eventSystem,
+            out GameObject viewObject,
+            out PlayModeUIEventView view)
+        {
+            eventSystemObject = new GameObject($"{testName}-eventsystem");
+            eventSystem = eventSystemObject.AddComponent<EventSystem>();
+
+            viewObject = new GameObject($"{testName}-view");
+            view = viewObject.AddComponent<PlayModeUIEventView>();
+        }
+
+        private static void InvokeNonPublicGameViewMethod(GameView view, string methodName, params object[] args)
+        {
+            Assert.That(view, Is.Not.Null);
+            var method = typeof(GameView).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null, $"Method '{methodName}' was not found on GameView.");
+            method.Invoke(view, args);
         }
 
         private static IEnumerator WaitForCondition(System.Func<bool> condition, int maxFrames, string failureMessage)
