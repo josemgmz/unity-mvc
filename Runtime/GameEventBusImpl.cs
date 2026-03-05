@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace UnityMVC
@@ -26,6 +25,9 @@ namespace UnityMVC
 
         private Dictionary<Type, List<DelegateTask>> _eventHandlers;
         private CancellationTokenSource _cancellationToken;
+        private int _dispatchDepth;
+        private bool _hasDeferredCleanup;
+        private List<Type> _dirtyEventTypes;
 
         #endregion
 
@@ -39,6 +41,57 @@ namespace UnityMVC
         private void _removeListener(Type type, Delegate listener)
         {
             _forceRemoveListener(type, listener);
+        }
+
+        private void MarkTypeDirty(Type type)
+        {
+            if (!_dirtyEventTypes.Contains(type))
+            {
+                _dirtyEventTypes.Add(type);
+            }
+
+            _hasDeferredCleanup = true;
+        }
+
+        private static void MarkHandlerRemoved(List<DelegateTask> handlers, int index)
+        {
+            var entry = handlers[index];
+            if (entry.delegateCallback == null)
+            {
+                return;
+            }
+
+            entry.delegateCallback = null;
+            entry.cancellationToken = default;
+            handlers[index] = entry;
+        }
+
+        private void CleanupDeferredRemovals()
+        {
+            for (var typeIndex = 0; typeIndex < _dirtyEventTypes.Count; typeIndex++)
+            {
+                var eventType = _dirtyEventTypes[typeIndex];
+                if (!_eventHandlers.TryGetValue(eventType, out var handlers))
+                {
+                    continue;
+                }
+
+                for (var handlerIndex = handlers.Count - 1; handlerIndex >= 0; handlerIndex--)
+                {
+                    if (handlers[handlerIndex].delegateCallback == null)
+                    {
+                        handlers.RemoveAt(handlerIndex);
+                    }
+                }
+
+                if (handlers.Count == 0)
+                {
+                    _eventHandlers.Remove(eventType);
+                }
+            }
+
+            _dirtyEventTypes.Clear();
+            _hasDeferredCleanup = false;
         }
 
         internal void _forceAddListener(Type type, Delegate listener, GameController<GameView> owner = null)
@@ -56,14 +109,27 @@ namespace UnityMVC
             });
         }
         
-        internal async void _forceRemoveListener(Type type, Delegate listener)
+        internal void _forceRemoveListener(Type type, Delegate listener)
         {
-            await Task.Yield();
-            List<DelegateTask> handlers;
-            if (_eventHandlers.TryGetValue(type, out handlers))
+            if (!_eventHandlers.TryGetValue(type, out var handlers))
             {
-                var itemToRemove = handlers.Find(it => it.delegateCallback == listener);
-                handlers.Remove(itemToRemove);
+                return;
+            }
+
+            var indexToRemove = handlers.FindIndex(it => it.delegateCallback == listener);
+            if (indexToRemove < 0)
+            {
+                return;
+            }
+
+            if (_dispatchDepth > 0)
+            {
+                MarkHandlerRemoved(handlers, indexToRemove);
+                MarkTypeDirty(type);
+            }
+            else
+            {
+                handlers.RemoveAt(indexToRemove);
                 if (handlers.Count == 0)
                 {
                     _eventHandlers.Remove(type);
@@ -71,12 +137,24 @@ namespace UnityMVC
             }
         }
         
-        internal async void _forceRemoveListeners(Type type)
+        internal void _forceRemoveListeners(Type type)
         {
-            await Task.Yield();
             if (!_eventHandlers.TryGetValue(type, out var handlers)) return;
-            handlers.Clear();
-            _eventHandlers.Remove(type);
+
+            if (_dispatchDepth > 0)
+            {
+                for (var i = 0; i < handlers.Count; i++)
+                {
+                    MarkHandlerRemoved(handlers, i);
+                }
+
+                MarkTypeDirty(type);
+            }
+            else
+            {
+                handlers.Clear();
+                _eventHandlers.Remove(type);
+            }
         }
         
         public void AddListener<T>(Action<T> listener, GameController<GameView> owner = null) => _addListener(typeof(T), listener, owner);
@@ -106,46 +184,72 @@ namespace UnityMVC
         {
             var type = typeof(T);
             if (!_eventHandlers.TryGetValue(type, out var handlers)) return;
-            foreach (DelegateTask handler in handlers)
+
+            _dispatchDepth++;
+            try
             {
-                switch (handler.delegateCallback)
+                var initialHandlersCount = handlers.Count;
+                for (var i = 0; i < initialHandlersCount; i++)
                 {
-                    case Action action:
+                    if (i >= handlers.Count)
                     {
-                        if (!handler.cancellationToken.IsCancellationRequested)
+                        break;
+                    }
+
+                    var handler = handlers[i];
+                    if (handler.delegateCallback == null)
+                    {
+                        continue;
+                    }
+
+                    if (handler.cancellationToken.IsCancellationRequested)
+                    {
+                        MarkHandlerRemoved(handlers, i);
+                        MarkTypeDirty(type);
+                        continue;
+                    }
+
+                    switch (handler.delegateCallback)
+                    {
+                        case Action action:
                         {
                             action.Invoke();
+                            break;
                         }
-                        break;
-                    }
-                    case Action<T> typedAction:
-                    {
-                        if (!handler.cancellationToken.IsCancellationRequested)
+                        case Action<T> typedAction:
                         {
                             typedAction.Invoke(args);
+                            break;
                         }
-                        break;
-                    }
-                    case Func<IEnumerator> delegateCallback: 
-                    {
+                        case Func<IEnumerator> delegateCallback:
+                        {
 #if UNITYMVC_VCONTAINER
-                        GameDependency.StartCoroutine(delegateCallback());
+                            GameDependency.StartCoroutine(delegateCallback());
 #else
-                        Debug.LogError("Coroutine not implemented, enabled #if UNITYMVC_VCONTAINER to support Coroutine launch");
-#endif  
-                        break;
-                    }
-                    default:
-                    {
-                        var delegateCallback = (Func<T,IEnumerator>)handler.delegateCallback;
-                        
+                            Debug.LogError("Coroutine not implemented, enabled #if UNITYMVC_VCONTAINER to support Coroutine launch");
+#endif
+                            break;
+                        }
+                        default:
+                        {
+                            var delegateCallback = (Func<T,IEnumerator>)handler.delegateCallback;
+
 #if UNITYMVC_VCONTAINER
-                        GameDependency.StartCoroutine(delegateCallback(args));
+                            GameDependency.StartCoroutine(delegateCallback(args));
 #else
-                        Debug.LogError("Coroutine not implemented, enabled #if UNITYMVC_VCONTAINER to support Coroutine launch");
-#endif  
-                        break;
+                            Debug.LogError("Coroutine not implemented, enabled #if UNITYMVC_VCONTAINER to support Coroutine launch");
+#endif
+                            break;
+                        }
                     }
+                }
+            }
+            finally
+            {
+                _dispatchDepth--;
+                if (_dispatchDepth == 0 && _hasDeferredCleanup)
+                {
+                    CleanupDeferredRemovals();
                 }
             }
         }
@@ -164,6 +268,7 @@ namespace UnityMVC
         {
             _eventHandlers ??= new Dictionary<Type, List<DelegateTask>>();
             _cancellationToken ??= new CancellationTokenSource();
+            _dirtyEventTypes ??= new List<Type>();
         }
 
         ~GameEventBusImpl()

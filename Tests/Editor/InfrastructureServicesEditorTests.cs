@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
-using UnityEngine.TestTools;
 
 namespace UnityMVC.Tests.Editor
 {
@@ -66,8 +65,8 @@ namespace UnityMVC.Tests.Editor
             }));
         }
 
-        [UnityTest]
-        public IEnumerator EventBusRemovalIsDeferredInCurrentImplementation()
+        [Test]
+        public void EventBusRemovalIsImmediate()
         {
             var bus = CreateEventBus();
             var hits = new List<string>();
@@ -80,8 +79,32 @@ namespace UnityMVC.Tests.Editor
 
             bus.RemoveListener<TestEvent>(OnEvent);
             bus.RaiseEvent(new TestEvent("second"));
+            Assert.That(hits, Is.EqualTo(new[] { "first" }));
+        }
+
+        [Test]
+        public void EventBusSupportsRemovalDuringDispatch()
+        {
+            var bus = CreateEventBus();
+            var hits = new List<string>();
+
+            Action<TestEvent> first = null;
+            first = _ =>
+            {
+                hits.Add("first");
+                bus.RemoveListener<TestEvent>(first);
+            };
+
+            void Second(TestEvent _) => hits.Add("second");
+
+            bus.AddListener<TestEvent>(first);
+            bus.AddListener<TestEvent>(Second);
+
+            Assert.DoesNotThrow(() => bus.RaiseEvent(new TestEvent("event-a")));
             Assert.That(hits, Is.EqualTo(new[] { "first", "second" }));
-            yield return null;
+
+            bus.RaiseEvent(new TestEvent("event-b"));
+            Assert.That(hits, Is.EqualTo(new[] { "first", "second", "second" }));
         }
 
         private static GameEventBusImpl CreateEventBus()
