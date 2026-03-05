@@ -49,6 +49,18 @@ namespace UnityMVC.Tests.Runtime
             PlayModeCollisionController.DestroyRequestedOnEnter = false;
             PlayModeCollisionController.DestroyedObjectName = null;
             PlayModeCollisionController.DestroyOnEnterEnabled = false;
+
+            PlayModeTrigger3DController.EnterCalls = 0;
+            PlayModeTrigger3DController.StayCalls = 0;
+            PlayModeTrigger3DController.ExitCalls = 0;
+
+            PlayModeCollision2DController.EnterCalls = 0;
+            PlayModeCollision2DController.StayCalls = 0;
+            PlayModeCollision2DController.ExitCalls = 0;
+
+            PlayModeTrigger2DController.EnterCalls = 0;
+            PlayModeTrigger2DController.StayCalls = 0;
+            PlayModeTrigger2DController.ExitCalls = 0;
         }
 
         [UnityTest]
@@ -442,6 +454,333 @@ namespace UnityMVC.Tests.Runtime
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator PlayModeTriggerEnter3DIsInvoked()
+        {
+            CreateTrigger3DScene(
+                "trigger3d-enter",
+                out var triggerObject,
+                out var movingObject,
+                out _,
+                out _);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger3DController.EnterCalls > 0,
+                120,
+                "OnTriggerEnter (3D) was not triggered in time.");
+
+            Assert.That(PlayModeTrigger3DController.EnterCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (triggerObject != null)
+            {
+                Object.Destroy(triggerObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeTriggerStay3DIsInvokedWhileOverlapping()
+        {
+            CreateTrigger3DScene(
+                "trigger3d-stay",
+                out var triggerObject,
+                out var movingObject,
+                out _,
+                out _);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger3DController.EnterCalls > 0,
+                120,
+                "OnTriggerEnter (3D) was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger3DController.StayCalls > 0,
+                120,
+                "OnTriggerStay (3D) was not triggered in time.");
+
+            Assert.That(PlayModeTrigger3DController.StayCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (triggerObject != null)
+            {
+                Object.Destroy(triggerObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeTriggerExit3DIsInvokedWhenPairIsRemoved()
+        {
+            CreateTrigger3DScene(
+                "trigger3d-exit",
+                out var triggerObject,
+                out var movingObject,
+                out var triggerCollider,
+                out var movingCollider);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger3DController.EnterCalls > 0,
+                120,
+                "OnTriggerEnter (3D) was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger3DController.StayCalls > 0,
+                120,
+                "OnTriggerStay (3D) was not triggered in time.");
+
+            Assert.That(triggerCollider, Is.Not.Null);
+            Assert.That(movingCollider, Is.Not.Null);
+            Physics.IgnoreCollision(movingCollider, triggerCollider, true);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger3DController.ExitCalls > 0,
+                120,
+                "OnTriggerExit (3D) was not triggered in time.");
+
+            Assert.That(PlayModeTrigger3DController.ExitCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (triggerObject != null)
+            {
+                Object.Destroy(triggerObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeCollisionEnter2DIsInvoked()
+        {
+            CreateCollision2DScene(
+                "collision2d-enter",
+                out var floorObject,
+                out var movingObject,
+                out _,
+                out _);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollision2DController.EnterCalls > 0,
+                120,
+                "OnCollisionEnter2D was not triggered in time.");
+
+            Assert.That(PlayModeCollision2DController.EnterCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (floorObject != null)
+            {
+                Object.Destroy(floorObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeCollisionStay2DIsInvoked()
+        {
+            CreateCollision2DScene(
+                "collision2d-stay",
+                out var floorObject,
+                out var movingObject,
+                out _,
+                out _);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollision2DController.EnterCalls > 0,
+                120,
+                "OnCollisionEnter2D was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollision2DController.StayCalls > 0,
+                120,
+                "OnCollisionStay2D was not triggered in time.");
+
+            Assert.That(PlayModeCollision2DController.StayCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (floorObject != null)
+            {
+                Object.Destroy(floorObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeCollisionExit2DIsInvokedWhenPairIsRemoved()
+        {
+            CreateCollision2DScene(
+                "collision2d-exit",
+                out var floorObject,
+                out var movingObject,
+                out var floorCollider,
+                out var movingCollider);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollision2DController.EnterCalls > 0,
+                120,
+                "OnCollisionEnter2D was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollision2DController.StayCalls > 0,
+                120,
+                "OnCollisionStay2D was not triggered in time.");
+
+            Assert.That(floorCollider, Is.Not.Null);
+            Assert.That(movingCollider, Is.Not.Null);
+            Physics2D.IgnoreCollision(movingCollider, floorCollider, true);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeCollision2DController.ExitCalls > 0,
+                120,
+                "OnCollisionExit2D was not triggered in time.");
+
+            Assert.That(PlayModeCollision2DController.ExitCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (floorObject != null)
+            {
+                Object.Destroy(floorObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeTriggerEnter2DIsInvoked()
+        {
+            CreateTrigger2DScene(
+                "trigger2d-enter",
+                out var triggerObject,
+                out var movingObject,
+                out _,
+                out _);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger2DController.EnterCalls > 0,
+                120,
+                "OnTriggerEnter2D was not triggered in time.");
+
+            Assert.That(PlayModeTrigger2DController.EnterCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (triggerObject != null)
+            {
+                Object.Destroy(triggerObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeTriggerStay2DIsInvoked()
+        {
+            CreateTrigger2DScene(
+                "trigger2d-stay",
+                out var triggerObject,
+                out var movingObject,
+                out _,
+                out _);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger2DController.EnterCalls > 0,
+                120,
+                "OnTriggerEnter2D was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger2DController.StayCalls > 0,
+                120,
+                "OnTriggerStay2D was not triggered in time.");
+
+            Assert.That(PlayModeTrigger2DController.StayCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (triggerObject != null)
+            {
+                Object.Destroy(triggerObject);
+            }
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeTriggerExit2DIsInvokedWhenPairIsRemoved()
+        {
+            CreateTrigger2DScene(
+                "trigger2d-exit",
+                out var triggerObject,
+                out var movingObject,
+                out var triggerCollider,
+                out var movingCollider);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger2DController.EnterCalls > 0,
+                120,
+                "OnTriggerEnter2D was not triggered in time.");
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger2DController.StayCalls > 0,
+                120,
+                "OnTriggerStay2D was not triggered in time.");
+
+            Assert.That(triggerCollider, Is.Not.Null);
+            Assert.That(movingCollider, Is.Not.Null);
+            Physics2D.IgnoreCollision(movingCollider, triggerCollider, true);
+
+            yield return WaitForFixedCondition(
+                () => PlayModeTrigger2DController.ExitCalls > 0,
+                120,
+                "OnTriggerExit2D was not triggered in time.");
+
+            Assert.That(PlayModeTrigger2DController.ExitCalls, Is.GreaterThanOrEqualTo(1));
+
+            if (movingObject != null)
+            {
+                Object.Destroy(movingObject);
+            }
+
+            if (triggerObject != null)
+            {
+                Object.Destroy(triggerObject);
+            }
+
+            yield return null;
+        }
+
         [System.Serializable]
         public class PlayModeModel : GameModel
         {
@@ -513,6 +852,24 @@ namespace UnityMVC.Tests.Runtime
             [GameFieldAttributes.ControllerField] private PlayModeCollisionController collisionController;
         }
 
+        public class PlayModeTrigger3DView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeTrigger3DModel model;
+            [GameFieldAttributes.ControllerField] private PlayModeTrigger3DController triggerController;
+        }
+
+        public class PlayModeCollision2DView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeCollision2DModel model;
+            [GameFieldAttributes.ControllerField] private PlayModeCollision2DController collisionController;
+        }
+
+        public class PlayModeTrigger2DView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeTrigger2DModel model;
+            [GameFieldAttributes.ControllerField] private PlayModeTrigger2DController triggerController;
+        }
+
         public class PlayModeSurfaceMarker : MonoBehaviour
         {
         }
@@ -526,6 +883,21 @@ namespace UnityMVC.Tests.Runtime
 
         [System.Serializable]
         public class PlayModeCollisionModel : GameModel
+        {
+        }
+
+        [System.Serializable]
+        public class PlayModeTrigger3DModel : GameModel
+        {
+        }
+
+        [System.Serializable]
+        public class PlayModeCollision2DModel : GameModel
+        {
+        }
+
+        [System.Serializable]
+        public class PlayModeTrigger2DModel : GameModel
         {
         }
 
@@ -580,6 +952,72 @@ namespace UnityMVC.Tests.Runtime
                 {
                     Destroy(value);
                 }
+            }
+        }
+
+        public class PlayModeTrigger3DController : GameController<PlayModeTrigger3DView, PlayModeTrigger3DModel>
+        {
+            public static int EnterCalls;
+            public static int StayCalls;
+            public static int ExitCalls;
+
+            private void OnTriggerEnter(Collider other)
+            {
+                EnterCalls++;
+            }
+
+            private void OnTriggerStay(Collider other)
+            {
+                StayCalls++;
+            }
+
+            private void OnTriggerExit(Collider other)
+            {
+                ExitCalls++;
+            }
+        }
+
+        public class PlayModeCollision2DController : GameController<PlayModeCollision2DView, PlayModeCollision2DModel>
+        {
+            public static int EnterCalls;
+            public static int StayCalls;
+            public static int ExitCalls;
+
+            private void OnCollisionEnter2D(Collision2D other)
+            {
+                EnterCalls++;
+            }
+
+            private void OnCollisionStay2D(Collision2D other)
+            {
+                StayCalls++;
+            }
+
+            private void OnCollisionExit2D(Collision2D other)
+            {
+                ExitCalls++;
+            }
+        }
+
+        public class PlayModeTrigger2DController : GameController<PlayModeTrigger2DView, PlayModeTrigger2DModel>
+        {
+            public static int EnterCalls;
+            public static int StayCalls;
+            public static int ExitCalls;
+
+            private void OnTriggerEnter2D(Collider2D other)
+            {
+                EnterCalls++;
+            }
+
+            private void OnTriggerStay2D(Collider2D other)
+            {
+                StayCalls++;
+            }
+
+            private void OnTriggerExit2D(Collider2D other)
+            {
+                ExitCalls++;
             }
         }
 
@@ -761,6 +1199,74 @@ namespace UnityMVC.Tests.Runtime
 
             floorCollider = floor.GetComponent<Collider>();
             fallingCollider = fallingObject.GetComponent<Collider>();
+        }
+
+        private static void CreateTrigger3DScene(
+            string testName,
+            out GameObject triggerObject,
+            out GameObject movingObject,
+            out Collider triggerCollider,
+            out Collider movingCollider)
+        {
+            triggerObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            triggerObject.name = $"{testName}-trigger";
+            triggerObject.transform.position = Vector3.zero;
+            triggerObject.transform.localScale = new Vector3(6f, 1f, 6f);
+            triggerCollider = triggerObject.GetComponent<Collider>();
+            if (triggerCollider != null)
+            {
+                triggerCollider.isTrigger = true;
+            }
+
+            movingObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            movingObject.name = $"{testName}-view";
+            movingObject.transform.position = new Vector3(0f, 2f, 0f);
+            movingCollider = movingObject.GetComponent<Collider>();
+            movingObject.AddComponent<Rigidbody>();
+            movingObject.AddComponent<PlayModeTrigger3DView>();
+        }
+
+        private static void CreateCollision2DScene(
+            string testName,
+            out GameObject floorObject,
+            out GameObject movingObject,
+            out Collider2D floorCollider,
+            out Collider2D movingCollider)
+        {
+            floorObject = new GameObject($"{testName}-floor");
+            floorObject.transform.position = Vector3.zero;
+            floorCollider = floorObject.AddComponent<BoxCollider2D>();
+            floorCollider.offset = new Vector2(0f, -0.5f);
+            floorCollider.transform.localScale = new Vector3(6f, 1f, 1f);
+
+            movingObject = new GameObject($"{testName}-view");
+            movingObject.transform.position = new Vector3(0f, 1.5f, 0f);
+            movingCollider = movingObject.AddComponent<BoxCollider2D>();
+            var rigidbody = movingObject.AddComponent<Rigidbody2D>();
+            rigidbody.gravityScale = 4f;
+            movingObject.AddComponent<PlayModeCollision2DView>();
+        }
+
+        private static void CreateTrigger2DScene(
+            string testName,
+            out GameObject triggerObject,
+            out GameObject movingObject,
+            out Collider2D triggerCollider,
+            out Collider2D movingCollider)
+        {
+            triggerObject = new GameObject($"{testName}-trigger");
+            triggerObject.transform.position = Vector3.zero;
+            triggerCollider = triggerObject.AddComponent<BoxCollider2D>();
+            triggerCollider.isTrigger = true;
+            triggerCollider.offset = new Vector2(0f, -0.5f);
+            triggerCollider.transform.localScale = new Vector3(6f, 1f, 1f);
+
+            movingObject = new GameObject($"{testName}-view");
+            movingObject.transform.position = new Vector3(0f, 1.5f, 0f);
+            movingCollider = movingObject.AddComponent<BoxCollider2D>();
+            var rigidbody = movingObject.AddComponent<Rigidbody2D>();
+            rigidbody.gravityScale = 4f;
+            movingObject.AddComponent<PlayModeTrigger2DView>();
         }
 
         private static IEnumerator WaitForCondition(System.Func<bool> condition, int maxFrames, string failureMessage)
