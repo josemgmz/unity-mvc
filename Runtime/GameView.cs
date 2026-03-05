@@ -312,7 +312,7 @@ namespace UnityMVC
 
                         if (!ShouldInstantiateController(executionMode, allowEditor))
                         {
-                            return;
+                            continue;
                         }
 
                         var controllerType = field.FieldType;

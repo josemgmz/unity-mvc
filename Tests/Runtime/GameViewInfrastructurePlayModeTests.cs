@@ -98,7 +98,7 @@ namespace UnityMVC.Tests.Runtime
         }
 
         [UnityTest]
-        public IEnumerator PlayModeSkipsControllersAfterFirstNonInstantiableEntryInCurrentImplementation()
+        public IEnumerator PlayModeInitializesAllControllersEligibleForCurrentExecutionMode()
         {
             var gameObject = new GameObject("playmode-execution");
             try
@@ -107,7 +107,7 @@ namespace UnityMVC.Tests.Runtime
 
                 yield return null;
 
-                Assert.That(view.TryGetController<PlayModePlayOnlyController>(out _), Is.False);
+                Assert.That(view.TryGetController<PlayModePlayOnlyController>(out _), Is.True);
                 Assert.That(view.TryGetController<PlayModeAlwaysController>(out _), Is.True);
                 Assert.That(view.TryGetController<PlayModeEditorOnlyController>(out _), Is.False);
             }
