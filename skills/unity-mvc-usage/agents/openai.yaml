@@ -1,0 +1,4 @@
+interface:
+  display_name: "UnityMVC Usage"
+  short_description: "UnityMVC user coding patterns"
+  default_prompt: "Use $unity-mvc-usage to create or refactor GameModel, GameView, and GameController scripts with event and data bus usage."
