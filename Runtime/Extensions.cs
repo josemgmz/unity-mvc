@@ -13,6 +13,12 @@ namespace UnityMVC
         /// </summary>
         public static bool TryGetController<T>(this GameObject go, out T controller)
         {
+            if (go == null)
+            {
+                controller = default!;
+                return false;
+            }
+
             var view = go.GetComponent<GameView>();
             if (view != null && view.TryGetController<T>(out controller))
             {
@@ -28,6 +34,12 @@ namespace UnityMVC
         /// </summary>
         public static bool TryGetController(this GameObject go, Type controllerType, out object controller)
         {
+            if (go == null || controllerType == null)
+            {
+                controller = null!;
+                return false;
+            }
+
             var view = go.GetComponent<GameView>();
             if (view != null && view.TryGetController(controllerType, out controller))
             {
@@ -47,12 +59,24 @@ namespace UnityMVC
         /// <inheritdoc cref="GameObjectExtensions.TryGetController{T}(GameObject,out T)"/>
         public static bool TryGetController<T>(this Collider2D col, out T controller)
         {
+            if (col == null)
+            {
+                controller = default!;
+                return false;
+            }
+
             return col.gameObject.TryGetController<T>(out controller);
         }
 
         /// <inheritdoc cref="GameObjectExtensions.TryGetController(UnityEngine.GameObject,System.Type,out object)"/>
         public static bool TryGetController(this Collider2D col, Type controllerType, out object controller)
         {
+            if (col == null)
+            {
+                controller = null!;
+                return false;
+            }
+
             return col.gameObject.TryGetController(controllerType, out controller);
         }
     }
@@ -65,11 +89,23 @@ namespace UnityMVC
         /// <inheritdoc cref="GameObjectExtensions.TryGetController{T}(GameObject,out T)"/>
         public static bool TryGetController<T>(this Collision2D collision, out T controller)
         {
+            if (collision == null)
+            {
+                controller = default!;
+                return false;
+            }
+
             return collision.gameObject.TryGetController<T>(out controller);
         }
         /// <inheritdoc cref="GameObjectExtensions.TryGetController(UnityEngine.GameObject,System.Type,out object)"/>
         public static bool TryGetController(this Collision2D collision, Type controllerType, out object controller)
         {
+            if (collision == null)
+            {
+                controller = null!;
+                return false;
+            }
+
             return collision.gameObject.TryGetController(controllerType, out controller);
         }
     }

@@ -424,7 +424,12 @@ namespace UnityMVC
             {
                 Awake();
             }
-            
+
+            if (_rawControllers == null || _rawControllers.Count == 0)
+            {
+                throw new Exception($"No controllers are initialized for view {GetType().Name}");
+            }
+             
             var type = typeof(T);
             // Try exact type first
             if (_rawControllers.TryGetValue(type, out var rawController))
@@ -446,6 +451,23 @@ namespace UnityMVC
         
         public bool TryGetController<T>(out T controller)
         {
+            try
+            {
+                EnsureControllersInitialized(allowEditor: true);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[MVC] Failed to initialize controllers while trying to resolve {typeof(T).Name} in view {GetType().Name}: {e.Message}");
+                controller = default!;
+                return false;
+            }
+
+            if (_rawControllers == null || _rawControllers.Count == 0)
+            {
+                controller = default!;
+                return false;
+            }
+
             var targetType = typeof(T);
             if (_rawControllers.TryGetValue(targetType, out var raw) && raw is T exactMatch)
             {
@@ -470,6 +492,29 @@ namespace UnityMVC
         /// </summary>
         public bool TryGetController(Type targetType, out object controller)
         {
+            if (targetType == null)
+            {
+                controller = null!;
+                return false;
+            }
+
+            try
+            {
+                EnsureControllersInitialized(allowEditor: true);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[MVC] Failed to initialize controllers while trying to resolve {targetType.Name} in view {GetType().Name}: {e.Message}");
+                controller = null!;
+                return false;
+            }
+
+            if (_rawControllers == null || _rawControllers.Count == 0)
+            {
+                controller = null!;
+                return false;
+            }
+
             if (_rawControllers.TryGetValue(targetType, out var raw))
             {
                 controller = raw!;

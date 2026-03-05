@@ -121,6 +121,52 @@ namespace UnityMVC.Tests.Runtime
         }
 
         [UnityTest]
+        public IEnumerator PlayModeTryGetControllerReturnsFalseWhenViewHasNoControllers()
+        {
+            var gameObject = new GameObject("playmode-no-controllers");
+            var view = gameObject.AddComponent<PlayModeModelOnlyView>();
+
+            var found = view.TryGetController<PlayModeLifecycleController>(out _);
+            Assert.That(found, Is.False);
+
+            var foundByType = view.TryGetController(typeof(PlayModeLifecycleController), out _);
+            Assert.That(foundByType, Is.False);
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeTryGetControllerReturnsFalseWhenControllerTypeIsNull()
+        {
+            var gameObject = new GameObject("playmode-null-controller-type");
+            var view = gameObject.AddComponent<PlayModeLifecycleView>();
+
+            var found = view.TryGetController(null, out _);
+            Assert.That(found, Is.False);
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeTryGetControllerExtensionsHandleNullInputs()
+        {
+            GameObject nullGameObject = null;
+            Collider2D nullCollider2D = null;
+            Collision2D nullCollision2D = null;
+
+            Assert.That(GameObjectExtensions.TryGetController<PlayModeLifecycleController>(nullGameObject, out _), Is.False);
+            Assert.That(GameObjectExtensions.TryGetController(nullGameObject, typeof(PlayModeLifecycleController), out _), Is.False);
+            Assert.That(Collider2DExtensions.TryGetController<PlayModeLifecycleController>(nullCollider2D, out _), Is.False);
+            Assert.That(Collider2DExtensions.TryGetController(nullCollider2D, typeof(PlayModeLifecycleController), out _), Is.False);
+            Assert.That(Collision2DExtensions.TryGetController<PlayModeLifecycleController>(nullCollision2D, out _), Is.False);
+            Assert.That(Collision2DExtensions.TryGetController(nullCollision2D, typeof(PlayModeLifecycleController), out _), Is.False);
+
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator PlayModeLifecycleAwakeIsInvokedOnce()
         {
             var gameObject = CreateLifecycleGameObject("playmode-awake");
@@ -1255,6 +1301,11 @@ namespace UnityMVC.Tests.Runtime
             [GameFieldAttributes.ControllerField] private PlayModePlayOnlyController playOnlyController;
             [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerEditorOnly] private PlayModeEditorOnlyController editorOnlyController;
             [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecuteAlways] private PlayModeAlwaysController alwaysController;
+        }
+
+        public class PlayModeModelOnlyView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeModel model;
         }
 
         public class PlayModePlayOnlyController : GameController<PlayModeExecutionModesView>
