@@ -14,9 +14,6 @@ namespace UnityMVC
 
         private readonly MethodInfo _methodInfo;
         private readonly int _parameterCount;
-        private readonly object _target;
-        private readonly Func<object, bool> _targetAliveEvaluator;
-        private bool _disabled;
 
         private readonly Action _zeroInvoker;
         private readonly Action<object> _singleInvoker;
@@ -24,12 +21,10 @@ namespace UnityMVC
         private readonly Action<object, object, object> _tripleInvoker;
         private readonly Action<object[]> _fallbackInvoker;
 
-        private GameMethod(MethodInfo methodInfo, object target, Func<object, bool> targetAliveEvaluator, int parameterCount, Action zeroInvoker, Action<object> singleInvoker,
+        private GameMethod(MethodInfo methodInfo, int parameterCount, Action zeroInvoker, Action<object> singleInvoker,
             Action<object, object> doubleInvoker, Action<object, object, object> tripleInvoker, Action<object[]> fallbackInvoker)
         {
             _methodInfo = methodInfo;
-            _target = target;
-            _targetAliveEvaluator = targetAliveEvaluator;
             _parameterCount = parameterCount;
             _zeroInvoker = zeroInvoker;
             _singleInvoker = singleInvoker;
@@ -47,26 +42,23 @@ namespace UnityMVC
 
             var parameters = method.GetParameters();
             var parameterLength = parameters.Length;
-            var targetAliveEvaluator = BuildTargetAliveEvaluator(target);
 
             if (method.ReturnType != typeof(void) || parameterLength > 3)
             {
                 var fallback = BuildReflectionInvoker(target, method);
-                return new GameMethod(method, target, targetAliveEvaluator, parameterLength, null, null, null, null, fallback);
+                return new GameMethod(method, parameterLength, null, null, null, null, fallback);
             }
 
             return parameterLength switch
             {
-                0 => new GameMethod(method, target, targetAliveEvaluator, 0, BuildZeroParameterInvoker(target, method), null, null, null, null),
-                1 => new GameMethod(method, target, targetAliveEvaluator, 1, null,
+                0 => new GameMethod(method, 0, BuildZeroParameterInvoker(target, method), null, null, null, null),
+                1 => new GameMethod(method, 1, null,
                     BuildSingleParameterInvoker(target, method, parameters[0].ParameterType), null, null, null),
-                2 => new GameMethod(method, target, targetAliveEvaluator, 2, null, null,
+                2 => new GameMethod(method, 2, null, null,
                     BuildDoubleParameterInvoker(target, method, parameters[0].ParameterType, parameters[1].ParameterType),
                     null, null),
                 3 => new GameMethod(
                     method,
-                    target,
-                    targetAliveEvaluator,
                     3,
                     null,
                     null,
@@ -84,11 +76,6 @@ namespace UnityMVC
 
         public void Invoke()
         {
-            if (!CanInvoke())
-            {
-                return;
-            }
-
             if (_parameterCount == 0 && _zeroInvoker != null)
             {
                 Execute(_zeroInvoker);
@@ -100,11 +87,6 @@ namespace UnityMVC
 
         public void Invoke<T>(T arg)
         {
-            if (!CanInvoke())
-            {
-                return;
-            }
-
             if (_parameterCount == 1 && _singleInvoker != null)
             {
                 ExecuteSingle(arg);
@@ -116,11 +98,6 @@ namespace UnityMVC
 
         public void Invoke<TFirst, TSecond>(TFirst arg1, TSecond arg2)
         {
-            if (!CanInvoke())
-            {
-                return;
-            }
-
             if (_parameterCount == 2 && _doubleInvoker != null)
             {
                 ExecuteDouble(arg1, arg2);
@@ -132,11 +109,6 @@ namespace UnityMVC
 
         public void Invoke<TFirst, TSecond, TThird>(TFirst arg1, TSecond arg2, TThird arg3)
         {
-            if (!CanInvoke())
-            {
-                return;
-            }
-
             if (_parameterCount == 3 && _tripleInvoker != null)
             {
                 ExecuteTriple(arg1, arg2, arg3);
@@ -148,11 +120,6 @@ namespace UnityMVC
 
         public void Invoke(params object[] args)
         {
-            if (!CanInvoke())
-            {
-                return;
-            }
-
             switch (_parameterCount)
             {
                 case 0:
@@ -186,7 +153,7 @@ namespace UnityMVC
             }
             catch (Exception e)
             {
-                HandleExecutionException(e);
+                LogExecutionError(e);
             }
         }
 
@@ -198,7 +165,7 @@ namespace UnityMVC
             }
             catch (Exception e)
             {
-                HandleExecutionException(e);
+                LogExecutionError(e);
             }
         }
 
@@ -210,7 +177,7 @@ namespace UnityMVC
             }
             catch (Exception e)
             {
-                HandleExecutionException(e);
+                LogExecutionError(e);
             }
         }
 
@@ -222,7 +189,7 @@ namespace UnityMVC
             }
             catch (Exception e)
             {
-                HandleExecutionException(e);
+                LogExecutionError(e);
             }
         }
 
@@ -242,98 +209,8 @@ namespace UnityMVC
             }
             catch (Exception e)
             {
-                HandleExecutionException(e);
+                LogExecutionError(e);
             }
-        }
-
-        private bool CanInvoke()
-        {
-            if (_disabled)
-            {
-                return false;
-            }
-
-            if (_targetAliveEvaluator == null)
-            {
-                return true;
-            }
-
-            var isAlive = true;
-            try
-            {
-                isAlive = _targetAliveEvaluator(_target);
-            }
-            catch
-            {
-                isAlive = false;
-            }
-
-            if (!isAlive)
-            {
-                _disabled = true;
-                return false;
-            }
-
-            return true;
-        }
-
-        private void HandleExecutionException(Exception e)
-        {
-            if (ShouldDisableAfterException(e))
-            {
-                _disabled = true;
-                Debug.LogWarning($"[MVC] Disabling cached delegate for '{_methodInfo.Name}' on '{_methodInfo.DeclaringType?.Name}' because target is destroyed.");
-                return;
-            }
-
-            LogExecutionError(e);
-        }
-
-        private static Func<object, bool> BuildTargetAliveEvaluator(object target)
-        {
-            if (target == null)
-            {
-                return null;
-            }
-
-            if (target is UnityEngine.Object unityTarget)
-            {
-                return _ => unityTarget != null;
-            }
-
-            var getViewMethod = target.GetType().GetMethod("GetView", BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null);
-            if (getViewMethod == null || !typeof(UnityEngine.Object).IsAssignableFrom(getViewMethod.ReturnType))
-            {
-                return null;
-            }
-
-            return controller =>
-            {
-                var view = getViewMethod.Invoke(controller, EmptyArgs) as UnityEngine.Object;
-                return view != null;
-            };
-        }
-
-        private static bool ShouldDisableAfterException(Exception e)
-        {
-            var current = e;
-            while (current != null)
-            {
-                if (current is MissingReferenceException || current is ObjectDisposedException)
-                {
-                    return true;
-                }
-
-                var message = current.Message;
-                if (!string.IsNullOrWhiteSpace(message) && message.IndexOf("has been destroyed", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return true;
-                }
-
-                current = current.InnerException;
-            }
-
-            return false;
         }
 
         private void LogExecutionError(Exception e)
