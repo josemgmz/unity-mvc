@@ -3,6 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+using Object = UnityEngine.Object;
 
 namespace UnityMVC.Tests.Editor
 {
@@ -81,6 +84,34 @@ namespace UnityMVC.Tests.Editor
                 "Three:gamma:3:True",
                 "Four:delta:4:False:1.5"
             }));
+        }
+
+        [Test]
+        public void GameMethodDisablesCachedDelegateAfterDestroyedObjectException()
+        {
+            var receiver = new MissingReferenceGameMethodReceiver();
+            var method = GameMethod.Create(receiver, receiver.GetType().GetMethod("TouchDestroyedObject", BindingFlags.Instance | BindingFlags.Public));
+
+            LogAssert.Expect(LogType.Warning, "[MVC] Disabling cached delegate for 'TouchDestroyedObject' on 'MissingReferenceGameMethodReceiver' because target is destroyed.");
+            method.Invoke();
+
+            LogAssert.NoUnexpectedReceived();
+            method.Invoke();
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
+        public void GameMethodSkipsInvocationWhenControllerViewIsDestroyed()
+        {
+            var view = new GameObject("destroyed-view");
+            var receiver = new ViewBackedGameMethodReceiver(view);
+            var method = GameMethod.Create(receiver, receiver.GetType().GetMethod("Tick", BindingFlags.Instance | BindingFlags.Public));
+
+            Object.DestroyImmediate(view);
+            method.Invoke();
+
+            Assert.That(receiver.Calls, Is.EqualTo(0));
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]
@@ -169,6 +200,32 @@ namespace UnityMVC.Tests.Editor
             public TestEvent(string value)
             {
                 Value = value;
+            }
+        }
+
+        private sealed class MissingReferenceGameMethodReceiver
+        {
+            public void TouchDestroyedObject()
+            {
+                throw new MissingReferenceException("The object has been destroyed.");
+            }
+        }
+
+        private sealed class ViewBackedGameMethodReceiver
+        {
+            private readonly GameObject _view;
+            public int Calls { get; private set; }
+
+            public ViewBackedGameMethodReceiver(GameObject view)
+            {
+                _view = view;
+            }
+
+            public GameObject GetView() => _view;
+
+            public void Tick()
+            {
+                Calls++;
             }
         }
     }
