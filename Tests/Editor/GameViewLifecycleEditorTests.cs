@@ -27,6 +27,8 @@ namespace UnityMVC.Tests.Editor
             AllUiEventsController.Log = _callLog;
             InvokableController.Log = _callLog;
             ReinitializeController.Log = _callLog;
+            ReentrantLookupController.AwakeCalls = 0;
+            ReentrantLookupController.LookupSucceeded = false;
         }
 
         [TearDown]
@@ -292,6 +294,16 @@ namespace UnityMVC.Tests.Editor
             Assert.That(secondController, Is.Not.SameAs(firstController));
             Assert.That(_callLog, Does.Contain("ReinitializeController.ctor"));
             Assert.That(_callLog, Does.Contain("ReinitializeController.Awake"));
+        }
+
+        [Test]
+        public void TryGetControllerDuringControllerAwakeDoesNotReenterInitialization()
+        {
+            var view = CreateComponent<ReentrantLookupView>("reentrant-lookup");
+
+            Assert.DoesNotThrow(() => view.GetController<ReentrantLookupController>());
+            Assert.That(ReentrantLookupController.AwakeCalls, Is.EqualTo(1));
+            Assert.That(ReentrantLookupController.LookupSucceeded, Is.True);
         }
 
         private T CreateComponent<T>(string name) where T : Component
@@ -560,6 +572,32 @@ namespace UnityMVC.Tests.Editor
             public static List<string> Log;
             public ReinitializeController() => Log?.Add("ReinitializeController.ctor");
             private void Awake() => Log?.Add("ReinitializeController.Awake");
+        }
+
+        public class ReentrantLookupView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private EventModel model;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecuteAlways] private ReentrantTargetController targetController;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecuteAlways] private ReentrantLookupController lookupController;
+        }
+
+        public class ReentrantTargetController : GameController<ReentrantLookupView>
+        {
+            public ReentrantTargetController() {}
+        }
+
+        public class ReentrantLookupController : GameController<ReentrantLookupView>
+        {
+            public static int AwakeCalls;
+            public static bool LookupSucceeded;
+
+            public ReentrantLookupController() {}
+
+            private void Awake()
+            {
+                AwakeCalls++;
+                LookupSucceeded = GetView().TryGetController<ReentrantTargetController>(out _);
+            }
         }
     }
 }

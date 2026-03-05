@@ -23,6 +23,7 @@ namespace UnityMVC
 #endif
         private CancellationTokenSource _cancellationToken = new CancellationTokenSource();
         private bool _controllersInitialized = false;
+        private bool _controllersInitializing = false;
         private bool _modelsInitialized = false;
         
         private const string INITIALIZE_METHOD = "Initialize";
@@ -82,9 +83,19 @@ namespace UnityMVC
 
         private void EnsureControllersInitialized(bool allowEditor = false)
         {
+            if (_controllersInitializing)
+            {
+                return;
+            }
+
             if (!_awakeWasCalled)
             {
                 Awake();
+            }
+
+            if (_controllersInitializing)
+            {
+                return;
             }
 
             InitializeControllerAttributes(allowEditor);
@@ -245,145 +256,158 @@ namespace UnityMVC
                 return;
             }
 
+            if (_controllersInitializing)
+            {
+                return;
+            }
+
             var allowInitialization = Application.isPlaying || allowEditor;
             if (!allowInitialization)
             {
                 return;
             }
 
-            _gameMethods = new GameMethods();
-            _rawControllers ??= new Dictionary<Type, object>();
-            _rawControllers.Clear();
+            _controllersInitializing = true;
+            try
+            {
+                _gameMethods = new GameMethods();
+                _rawControllers ??= new Dictionary<Type, object>();
+                _rawControllers.Clear();
 
-            // Discover all controller fields on the view
-            var type = GetType();
-            var fields = new List<FieldInfo>();
-            var currentType = type;
-            while (currentType != null)
-            {
-                fields.AddRange(currentType.GetFields(BINDING_FLAGS));
-                currentType = currentType.BaseType;
-            }
-            
-            // Check if any field has the reverse order attribute
-            var shouldReverse = false;
-            for (var index = 0; index < fields.Count; index++)
-            {
-                if (fields[index].GetCustomAttributes(typeof(GameFieldAttributes.ControllerReverseOrderAttribute), false).Length > 0)
+                // Discover all controller fields on the view
+                var type = GetType();
+                var fields = new List<FieldInfo>();
+                var currentType = type;
+                while (currentType != null)
                 {
-                    shouldReverse = true;
-                    break;
+                    fields.AddRange(currentType.GetFields(BINDING_FLAGS));
+                    currentType = currentType.BaseType;
                 }
-            }
             
-            if (!shouldReverse)
-            {
-                fields.Reverse();
-            }
-                
-            for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
-            {
-                var field = fields[fieldIndex];
-                var attributes = field.GetCustomAttributes(typeof(GameFieldAttributes.ControllerFieldAttribute), false);
-                if (attributes.Length > 0)
+                // Check if any field has the reverse order attribute
+                var shouldReverse = false;
+                for (var index = 0; index < fields.Count; index++)
                 {
-                    var executionAttribute = field.GetCustomAttributes(typeof(GameFieldAttributes.ControllerExecutionAttribute), false)
-                        .FirstOrDefault() as GameFieldAttributes.ControllerExecutionAttribute;
-                    var executionMode = executionAttribute?.Mode ?? GameFieldAttributes.ControllerExecutionMode.PlayOnly;
-
-                    if (!ShouldInstantiateController(executionMode, allowEditor))
+                    if (fields[index].GetCustomAttributes(typeof(GameFieldAttributes.ControllerReverseOrderAttribute), false).Length > 0)
                     {
-                        return;
-                    }
-
-                    var controllerType = field.FieldType;
-                    var controllerInstance = Activator.CreateInstance(controllerType, this);
-                    field.SetValue(this, controllerInstance);
-                    try
-                    {
-#if UNITYMVC_VCONTAINER
-                        _dependency?.Inject(controllerInstance); // Inject dependencies into the controller
-#endif
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogWarning("[MVC] Dependency injection failed for controller " + controllerType.Name + ": " + e.Message);
-                    }
-                    _rawControllers.Add(controllerType, controllerInstance);
-                }
-            }
-            
-            // Wire up each controller
-            foreach (var it in _rawControllers.Values)
-            {
-                // Bind SetView
-                var setViewMethod = it.GetType().GetMethod(SET_VIEW_METHOD, BINDING_FLAGS);
-                var setViewParameters = new object[] { this };
-                setViewMethod?.Invoke(it, setViewParameters);
-                
-                // Bind SetModel for every model
-                foreach (var model in _rawModels)
-                {
-                    var setModelMethod = it.GetType().GetMethod(SET_MODEL_METHOD, BINDING_FLAGS)!.MakeGenericMethod(model.Key);
-                    var setModelParameters = new object[] { model.Value };
-                    setModelMethod?.Invoke(it, setModelParameters);
-                }
-                
-                Type baseType = it.GetType();
-                while (baseType != null && baseType != typeof(object))
-                {
-                    if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(GameController<,>))
-                    {
-                        // Found a GameController<TView, TModel> base class
+                        shouldReverse = true;
                         break;
                     }
-                    baseType = baseType.BaseType!;
                 }
-                // If a GameController<TView, TModel> base was found
-                if (baseType != null && baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(GameController<,>))
+            
+                if (!shouldReverse)
                 {
-                    Type[] genericArguments = baseType.GenericTypeArguments;
-                    var modelType = genericArguments[1]; // This is TModel
-                    var model = _rawModels[modelType];
-                    
-                    var setModelMethod = it.GetType().GetMethod(SET_INTERNAL_MODEL_METHOD, BINDING_FLAGS);
-                    var setModelParameters = new object[] { model };
-                    setModelMethod?.Invoke(it, setModelParameters);
+                    fields.Reverse();
                 }
-            }
-
-            // Gather all event methods to bind
-            // Bind controller methods to GameMethodEvents
-            foreach (var it in _rawControllers.Values)
-            {
-                for (var eventIndex = 0; eventIndex < GAME_METHOD_EVENTS.Length; eventIndex++)
+                
+                for (var fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
                 {
-                    var methodToBind = GAME_METHOD_EVENTS[eventIndex];
-                    var newMethod = it.GetType().GetMethod(methodToBind.ToString(), BINDING_FLAGS);
-                    if (newMethod != null)
+                    var field = fields[fieldIndex];
+                    var attributes = field.GetCustomAttributes(typeof(GameFieldAttributes.ControllerFieldAttribute), false);
+                    if (attributes.Length > 0)
                     {
-                        var cachedMethod = GameMethod.Create(it, newMethod);
-                        _gameMethods.AddMethod(methodToBind, cachedMethod);
+                        var executionAttribute = field.GetCustomAttributes(typeof(GameFieldAttributes.ControllerExecutionAttribute), false)
+                            .FirstOrDefault() as GameFieldAttributes.ControllerExecutionAttribute;
+                        var executionMode = executionAttribute?.Mode ?? GameFieldAttributes.ControllerExecutionMode.PlayOnly;
+
+                        if (!ShouldInstantiateController(executionMode, allowEditor))
+                        {
+                            return;
+                        }
+
+                        var controllerType = field.FieldType;
+                        var controllerInstance = Activator.CreateInstance(controllerType, this);
+                        field.SetValue(this, controllerInstance);
+                        try
+                        {
+#if UNITYMVC_VCONTAINER
+                            _dependency?.Inject(controllerInstance); // Inject dependencies into the controller
+#endif
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogWarning("[MVC] Dependency injection failed for controller " + controllerType.Name + ": " + e.Message);
+                        }
+                        _rawControllers.Add(controllerType, controllerInstance);
                     }
                 }
-            }
             
-            // PreAwake on controllers
-            foreach (var it in _rawControllers.Values)
-            {
-                // Find Awake and call
-                var invokeMethod = it.GetType().GetMethod(PRE_AWAKE_METHOD, BINDING_FLAGS);
-                invokeMethod?.Invoke(it, null);
-            }
-            
-            // Awake on controllers
-            foreach (var it in _rawControllers.Values)
-            {
-                var invokeMethod = it.GetType().GetMethod(AWAKE_METHOD, BINDING_FLAGS);
-                invokeMethod?.Invoke(it, null);
-            }
+                // Wire up each controller
+                foreach (var it in _rawControllers.Values)
+                {
+                    // Bind SetView
+                    var setViewMethod = it.GetType().GetMethod(SET_VIEW_METHOD, BINDING_FLAGS);
+                    var setViewParameters = new object[] { this };
+                    setViewMethod?.Invoke(it, setViewParameters);
+                
+                    // Bind SetModel for every model
+                    foreach (var model in _rawModels)
+                    {
+                        var setModelMethod = it.GetType().GetMethod(SET_MODEL_METHOD, BINDING_FLAGS)!.MakeGenericMethod(model.Key);
+                        var setModelParameters = new object[] { model.Value };
+                        setModelMethod?.Invoke(it, setModelParameters);
+                    }
+                
+                    Type baseType = it.GetType();
+                    while (baseType != null && baseType != typeof(object))
+                    {
+                        if (baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(GameController<,>))
+                        {
+                            // Found a GameController<TView, TModel> base class
+                            break;
+                        }
+                        baseType = baseType.BaseType!;
+                    }
+                    // If a GameController<TView, TModel> base was found
+                    if (baseType != null && baseType.IsGenericType && baseType.GetGenericTypeDefinition() == typeof(GameController<,>))
+                    {
+                        Type[] genericArguments = baseType.GenericTypeArguments;
+                        var modelType = genericArguments[1]; // This is TModel
+                        var model = _rawModels[modelType];
+                    
+                        var setModelMethod = it.GetType().GetMethod(SET_INTERNAL_MODEL_METHOD, BINDING_FLAGS);
+                        var setModelParameters = new object[] { model };
+                        setModelMethod?.Invoke(it, setModelParameters);
+                    }
+                }
 
-            _controllersInitialized = true;
+                // Gather all event methods to bind
+                // Bind controller methods to GameMethodEvents
+                foreach (var it in _rawControllers.Values)
+                {
+                    for (var eventIndex = 0; eventIndex < GAME_METHOD_EVENTS.Length; eventIndex++)
+                    {
+                        var methodToBind = GAME_METHOD_EVENTS[eventIndex];
+                        var newMethod = it.GetType().GetMethod(methodToBind.ToString(), BINDING_FLAGS);
+                        if (newMethod != null)
+                        {
+                            var cachedMethod = GameMethod.Create(it, newMethod);
+                            _gameMethods.AddMethod(methodToBind, cachedMethod);
+                        }
+                    }
+                }
+            
+                // PreAwake on controllers
+                foreach (var it in _rawControllers.Values)
+                {
+                    // Find Awake and call
+                    var invokeMethod = it.GetType().GetMethod(PRE_AWAKE_METHOD, BINDING_FLAGS);
+                    invokeMethod?.Invoke(it, null);
+                }
+            
+                // Awake on controllers
+                foreach (var it in _rawControllers.Values)
+                {
+                    var invokeMethod = it.GetType().GetMethod(AWAKE_METHOD, BINDING_FLAGS);
+                    invokeMethod?.Invoke(it, null);
+                }
+
+                _controllersInitialized = true;
+            }
+            finally
+            {
+                _controllersInitializing = false;
+            }
         }
 
         #endregion
