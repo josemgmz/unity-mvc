@@ -38,8 +38,26 @@ namespace UnityMVC.Tests.Editor
             Assert.That(model, Is.Not.Null);
             Assert.That(model.Value, Is.EqualTo("payload"));
 
+            var modelFromSecondCall = bus.GetData<DataBusModel>("payload-2");
+            Assert.That(modelFromSecondCall, Is.Not.Null);
+            Assert.That(modelFromSecondCall.Value, Is.EqualTo("payload-2"));
+
             bus.RemoveListener(first);
             bus.RemoveListener(second);
+            bus.RemoveListener<DataBusModel, string>(modelFactory);
+        }
+
+        [Test]
+        public void DataBusThrowsWhenArgumentCountDoesNotMatchHandler()
+        {
+            var bus = GameDataBusImpl.Instance;
+            Func<string, DataBusModel> modelFactory = value => new DataBusModel { Value = value };
+            bus.AddListener<DataBusModel, string>(modelFactory);
+
+            var exception = Assert.Throws<Exception>(() => bus.GetData<DataBusModel>("a", "b"));
+            Assert.That(exception, Is.Not.Null);
+            Assert.That(exception.Message, Does.Contain("parameters"));
+
             bus.RemoveListener<DataBusModel, string>(modelFactory);
         }
 

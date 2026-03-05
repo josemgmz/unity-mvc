@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
-using UnityEngine.Diagnostics;
 
 namespace UnityMVC
 {
@@ -12,8 +10,23 @@ namespace UnityMVC
     public class GameDataBusImpl : IGameDataBus
     {
         #region Properties
+        
+        private sealed class DelegateInvoker
+        {
+            public int ParameterCount { get; }
+            public Type ReturnType { get; }
+            public Func<Delegate, object[], object> Invoke { get; }
+
+            public DelegateInvoker(int parameterCount, Type returnType, Func<Delegate, object[], object> invoke)
+            {
+                ParameterCount = parameterCount;
+                ReturnType = returnType;
+                Invoke = invoke;
+            }
+        }
 
         private Dictionary<Type, List<Delegate>> _eventHandlers;
+        private Dictionary<Type, DelegateInvoker> _delegateInvokersByType;
 
         private static GameDataBusImpl _instance;
 
@@ -55,6 +68,42 @@ namespace UnityMVC
                 Instance._eventHandlers.Remove(type);
             }
         }
+
+        private DelegateInvoker GetOrCreateDelegateInvoker(Delegate handler)
+        {
+            var delegateType = handler.GetType();
+            if (Instance._delegateInvokersByType.TryGetValue(delegateType, out var cachedInvoker))
+            {
+                return cachedInvoker;
+            }
+
+            var invokeMethod = delegateType.GetMethod("Invoke");
+            if (invokeMethod == null)
+            {
+                throw new InvalidOperationException($"Cannot resolve Invoke method for delegate type {delegateType.FullName}");
+            }
+
+            var parameters = invokeMethod.GetParameters();
+            var parameterCount = parameters.Length;
+            var handlerParameter = Expression.Parameter(typeof(Delegate), "handler");
+            var argumentsParameter = Expression.Parameter(typeof(object[]), "arguments");
+            var castedHandler = Expression.Convert(handlerParameter, delegateType);
+            var callArguments = new Expression[parameterCount];
+            for (var index = 0; index < parameterCount; index++)
+            {
+                var parameterType = parameters[index].ParameterType;
+                var argumentAtIndex = Expression.ArrayIndex(argumentsParameter, Expression.Constant(index));
+                callArguments[index] = Expression.Convert(argumentAtIndex, parameterType);
+            }
+
+            var invokeExpression = Expression.Invoke(castedHandler, callArguments);
+            var boxedResult = Expression.Convert(invokeExpression, typeof(object));
+            var lambda = Expression.Lambda<Func<Delegate, object[], object>>(boxedResult, handlerParameter, argumentsParameter);
+            var compiledInvoker = lambda.Compile();
+            var delegateInvoker = new DelegateInvoker(parameterCount, invokeMethod.ReturnType, compiledInvoker);
+            Instance._delegateInvokersByType.Add(delegateType, delegateInvoker);
+            return delegateInvoker;
+        }
         
         public void AddListenerReflection<T>(Func<T> listener) => _addListener(typeof(T), listener);
         public void AddListener<T>(Func<T> listener) => _addListener(typeof(T), listener);
@@ -74,8 +123,18 @@ namespace UnityMVC
         public T GetData<T>() where T : class
         {
             var type = typeof(T);
-            List<Delegate> handlers;
-            return Instance._eventHandlers.TryGetValue(type, out handlers) ? (from Func<T> handler in handlers select handler()).FirstOrDefault() : null;
+            if (!Instance._eventHandlers.TryGetValue(type, out var handlers))
+            {
+                return null;
+            }
+
+            foreach (Delegate handler in handlers)
+            {
+                var result = ((Func<T>)handler).Invoke();
+                return result;
+            }
+
+            return null;
         }
         /// <summary>
         /// Invokes providers for <typeparamref name="T"/> with arguments and returns the first result (clones if it is a <see cref="GameModel"/>).
@@ -83,19 +142,28 @@ namespace UnityMVC
         public T GetData<T>(params object[] args) where T : class
         {
             var type = typeof(T);
-            List<Delegate> handlers;
-            if (!Instance._eventHandlers.TryGetValue(type, out handlers)) return null;
+            if (!Instance._eventHandlers.TryGetValue(type, out var handlers))
+            {
+                return null;
+            }
+
+            var invokeArguments = args ?? Array.Empty<object>();
             foreach (Delegate handler in handlers)
             {
-                if (handler.Method.ReturnType != type) throw new Exception($"Return type of handler {handler.Method.Name} is not {type}");
-                if (handler.Method.GetParameters().Length != args.Length) throw new Exception($"Handler {handler.Method.Name} has {handler.Method.GetParameters().Length} parameters, expected {args.Length}");
+                var invoker = GetOrCreateDelegateInvoker(handler);
+                if (invoker.ReturnType != type)
+                {
+                    throw new Exception($"Return type of handler {handler.Method.Name} is not {type}");
+                }
+                
+                if (invoker.ParameterCount != invokeArguments.Length)
+                {
+                    throw new Exception($"Handler {handler.Method.Name} has {invoker.ParameterCount} parameters, expected {invokeArguments.Length}");
+                }
+                
                 try
                 {
-                    var paramTypes = handler.Method.GetParameters().Select(p => p.ParameterType).ToArray();
-                    var genericType = Expression.GetFuncType(paramTypes.Concat(new[] { type }).ToArray());
-                    var target = handler.Target;
-                    var customDelegate = Delegate.CreateDelegate(genericType, target, handler.Method, true);
-                    var result = (T) customDelegate.DynamicInvoke(args);
+                    var result = (T)invoker.Invoke(handler, invokeArguments);
                     if (result is GameModel gameModelInstance) return (T) gameModelInstance.Clone();
                     return result;
                 }
@@ -119,6 +187,7 @@ namespace UnityMVC
         {
             if (_eventHandlers != null) return;
             _eventHandlers = new Dictionary<Type, List<Delegate>>();
+            _delegateInvokersByType = new Dictionary<Type, DelegateInvoker>();
         }
 
         ~GameDataBusImpl()
@@ -129,6 +198,8 @@ namespace UnityMVC
             }
             _eventHandlers.Clear();
             _eventHandlers = null;
+            _delegateInvokersByType?.Clear();
+            _delegateInvokersByType = null;
             _instance = null;
         }
         #endregion
