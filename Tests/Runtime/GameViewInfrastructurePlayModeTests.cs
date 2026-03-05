@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -85,6 +84,17 @@ namespace UnityMVC.Tests.Runtime
             PlayModeUIEventController.PointerEnterCalls = 0;
             PlayModeUIEventController.SelectCalls = 0;
             PlayModeUIEventController.DeselectCalls = 0;
+            PlayModeUIEventController.CallOrder = new List<string>();
+            PlayModeUIEventController.LastBeginDragData = null;
+            PlayModeUIEventController.LastDragData = null;
+            PlayModeUIEventController.LastEndDragData = null;
+            PlayModeUIEventController.LastPointerDownData = null;
+            PlayModeUIEventController.LastPointerExitData = null;
+            PlayModeUIEventController.LastPointerUpData = null;
+            PlayModeUIEventController.LastPointerMoveData = null;
+            PlayModeUIEventController.LastPointerEnterData = null;
+            PlayModeUIEventController.LastSelectData = null;
+            PlayModeUIEventController.LastDeselectData = null;
         }
 
         [UnityTest]
@@ -812,7 +822,7 @@ namespace UnityMVC.Tests.Runtime
             var view = gameObject.AddComponent<PlayModeRenderEventView>();
             yield return null;
 
-            InvokeNonPublicGameViewMethod(view, "OnAnimatorEvent", "anim-event-value");
+            view.SendMessage("OnAnimatorEvent", "anim-event-value", SendMessageOptions.RequireReceiver);
 
             Assert.That(PlayModeRenderEventController.AnimatorEventCalls, Is.EqualTo(1));
             Assert.That(PlayModeRenderEventController.LastAnimatorEventValue, Is.EqualTo("anim-event-value"));
@@ -828,7 +838,7 @@ namespace UnityMVC.Tests.Runtime
             var view = gameObject.AddComponent<PlayModeRenderEventView>();
             yield return null;
 
-            InvokeNonPublicGameViewMethod(view, "OnBecameInvisible");
+            view.SendMessage("OnBecameInvisible", SendMessageOptions.RequireReceiver);
 
             Assert.That(PlayModeRenderEventController.BecameInvisibleCalls, Is.EqualTo(1));
 
@@ -843,7 +853,7 @@ namespace UnityMVC.Tests.Runtime
             var view = gameObject.AddComponent<PlayModeRenderEventView>();
             yield return null;
 
-            InvokeNonPublicGameViewMethod(view, "OnParticleSystemStopped");
+            view.SendMessage("OnParticleSystemStopped", SendMessageOptions.RequireReceiver);
 
             Assert.That(PlayModeRenderEventController.ParticleSystemStoppedCalls, Is.EqualTo(1));
 
@@ -858,7 +868,7 @@ namespace UnityMVC.Tests.Runtime
             var view = gameObject.AddComponent<PlayModeRenderEventView>();
             yield return null;
 
-            InvokeNonPublicGameViewMethod(view, "OnDrawGizmos");
+            view.SendMessage("OnDrawGizmos", SendMessageOptions.RequireReceiver);
 
             Assert.That(PlayModeRenderEventController.DrawGizmosCalls, Is.EqualTo(1));
 
@@ -873,7 +883,7 @@ namespace UnityMVC.Tests.Runtime
             var view = gameObject.AddComponent<PlayModeRenderEventView>();
             yield return null;
 
-            InvokeNonPublicGameViewMethod(view, "OnDrawGizmosSelected");
+            view.SendMessage("OnDrawGizmosSelected", SendMessageOptions.RequireReceiver);
 
             Assert.That(PlayModeRenderEventController.DrawGizmosSelectedCalls, Is.EqualTo(1));
 
@@ -888,7 +898,7 @@ namespace UnityMVC.Tests.Runtime
             var view = gameObject.AddComponent<PlayModeMouseEventView>();
             yield return null;
 
-            InvokeNonPublicGameViewMethod(view, "OnMouseDown");
+            view.SendMessage("OnMouseDown", SendMessageOptions.RequireReceiver);
 
             Assert.That(PlayModeMouseEventController.MouseDownCalls, Is.EqualTo(1));
 
@@ -903,7 +913,7 @@ namespace UnityMVC.Tests.Runtime
             var view = gameObject.AddComponent<PlayModeMouseEventView>();
             yield return null;
 
-            InvokeNonPublicGameViewMethod(view, "OnMouseEnter");
+            view.SendMessage("OnMouseEnter", SendMessageOptions.RequireReceiver);
 
             Assert.That(PlayModeMouseEventController.MouseEnterCalls, Is.EqualTo(1));
 
@@ -918,7 +928,7 @@ namespace UnityMVC.Tests.Runtime
             var view = gameObject.AddComponent<PlayModeMouseEventView>();
             yield return null;
 
-            InvokeNonPublicGameViewMethod(view, "OnMouseExit");
+            view.SendMessage("OnMouseExit", SendMessageOptions.RequireReceiver);
 
             Assert.That(PlayModeMouseEventController.MouseExitCalls, Is.EqualTo(1));
 
@@ -1125,6 +1135,114 @@ namespace UnityMVC.Tests.Runtime
             Object.Destroy(eventSystemObject);
             yield return null;
         }
+
+        [UnityTest]
+        public IEnumerator PlayModeUiDragFlowFollowsExpectedOrder()
+        {
+            CreateUiEventScene(
+                "playmode-ui-order",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem)
+            {
+                pointerId = 42,
+                position = new Vector2(111f, 222f)
+            };
+
+            view.OnPointerDown(pointerEventData);
+            view.OnBeginDrag(pointerEventData);
+            view.OnDrag(pointerEventData);
+            view.OnEndDrag(pointerEventData);
+            view.OnPointerUp(pointerEventData);
+
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "OnPointerDown",
+                    "OnBeginDrag",
+                    "OnDrag",
+                    "OnEndDrag",
+                    "OnPointerUp"
+                },
+                PlayModeUIEventController.CallOrder);
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlayModeUiPayloadForwardsOriginalEventDataInstances()
+        {
+            CreateUiEventScene(
+                "playmode-ui-payload",
+                out var eventSystemObject,
+                out var eventSystem,
+                out var viewObject,
+                out var view);
+
+            var pointerEventData = new PointerEventData(eventSystem)
+            {
+                pointerId = 7,
+                position = new Vector2(300f, 120f)
+            };
+            var baseEventData = new BaseEventData(eventSystem);
+
+            view.OnPointerEnter(pointerEventData);
+            view.OnPointerMove(pointerEventData);
+            view.OnPointerExit(pointerEventData);
+            view.OnSelect(baseEventData);
+            view.OnDeselect(baseEventData);
+
+            Assert.That(PlayModeUIEventController.LastPointerEnterData, Is.SameAs(pointerEventData));
+            Assert.That(PlayModeUIEventController.LastPointerMoveData, Is.SameAs(pointerEventData));
+            Assert.That(PlayModeUIEventController.LastPointerExitData, Is.SameAs(pointerEventData));
+            Assert.That(PlayModeUIEventController.LastSelectData, Is.SameAs(baseEventData));
+            Assert.That(PlayModeUIEventController.LastDeselectData, Is.SameAs(baseEventData));
+            Assert.That(PlayModeUIEventController.LastPointerMoveData.pointerId, Is.EqualTo(7));
+            Assert.That(PlayModeUIEventController.LastPointerMoveData.position, Is.EqualTo(new Vector2(300f, 120f)));
+
+            Object.Destroy(viewObject);
+            Object.Destroy(eventSystemObject);
+            yield return null;
+        }
+
+#if ENABLE_PARTICLE_SYSTEM
+        [UnityTest]
+        public IEnumerator PlayModeOnParticleSystemStoppedIsRaisedByUnityParticleCallback()
+        {
+            var gameObject = new GameObject("playmode-render-particle-real");
+            gameObject.AddComponent<PlayModeRenderEventView>();
+            var particleSystem = gameObject.AddComponent<ParticleSystem>();
+
+            yield return null;
+
+            var main = particleSystem.main;
+            main.loop = false;
+            main.duration = 0.05f;
+            main.startLifetime = 0.05f;
+            main.startSpeed = 0f;
+            main.stopAction = ParticleSystemStopAction.Callback;
+
+            var emission = particleSystem.emission;
+            emission.rateOverTime = 20f;
+
+            particleSystem.Play();
+
+            yield return WaitForCondition(
+                () => PlayModeRenderEventController.ParticleSystemStoppedCalls > 0,
+                240,
+                "OnParticleSystemStopped was not raised by Unity callback in time.");
+
+            Assert.That(PlayModeRenderEventController.ParticleSystemStoppedCalls, Is.GreaterThanOrEqualTo(1));
+
+            Object.Destroy(gameObject);
+            yield return null;
+        }
+#endif
 
         [System.Serializable]
         public class PlayModeModel : GameModel
@@ -1469,55 +1587,86 @@ namespace UnityMVC.Tests.Runtime
             public static int PointerEnterCalls;
             public static int SelectCalls;
             public static int DeselectCalls;
+            public static List<string> CallOrder;
+            public static PointerEventData LastBeginDragData;
+            public static PointerEventData LastDragData;
+            public static PointerEventData LastEndDragData;
+            public static PointerEventData LastPointerDownData;
+            public static PointerEventData LastPointerExitData;
+            public static PointerEventData LastPointerUpData;
+            public static PointerEventData LastPointerMoveData;
+            public static PointerEventData LastPointerEnterData;
+            public static BaseEventData LastSelectData;
+            public static BaseEventData LastDeselectData;
 
             private void OnBeginDrag(PointerEventData other)
             {
                 BeginDragCalls++;
+                LastBeginDragData = other;
+                CallOrder?.Add("OnBeginDrag");
             }
 
             private void OnDrag(PointerEventData other)
             {
                 DragCalls++;
+                LastDragData = other;
+                CallOrder?.Add("OnDrag");
             }
 
             private void OnEndDrag(PointerEventData other)
             {
                 EndDragCalls++;
+                LastEndDragData = other;
+                CallOrder?.Add("OnEndDrag");
             }
 
             private void OnPointerDown(PointerEventData other)
             {
                 PointerDownCalls++;
+                LastPointerDownData = other;
+                CallOrder?.Add("OnPointerDown");
             }
 
             private void OnPointerExit(PointerEventData other)
             {
                 PointerExitCalls++;
+                LastPointerExitData = other;
+                CallOrder?.Add("OnPointerExit");
             }
 
             private void OnPointerUp(PointerEventData other)
             {
                 PointerUpCalls++;
+                LastPointerUpData = other;
+                CallOrder?.Add("OnPointerUp");
             }
 
             private void OnPointerMove(PointerEventData other)
             {
                 PointerMoveCalls++;
+                LastPointerMoveData = other;
+                CallOrder?.Add("OnPointerMove");
             }
 
             private void OnPointerEnter(PointerEventData other)
             {
                 PointerEnterCalls++;
+                LastPointerEnterData = other;
+                CallOrder?.Add("OnPointerEnter");
             }
 
             private void OnSelect(BaseEventData eventData)
             {
                 SelectCalls++;
+                LastSelectData = eventData;
+                CallOrder?.Add("OnSelect");
             }
 
             private void OnDeselect(BaseEventData eventData)
             {
                 DeselectCalls++;
+                LastDeselectData = eventData;
+                CallOrder?.Add("OnDeselect");
             }
         }
 
@@ -1781,14 +1930,6 @@ namespace UnityMVC.Tests.Runtime
 
             viewObject = new GameObject($"{testName}-view");
             view = viewObject.AddComponent<PlayModeUIEventView>();
-        }
-
-        private static void InvokeNonPublicGameViewMethod(GameView view, string methodName, params object[] args)
-        {
-            Assert.That(view, Is.Not.Null);
-            var method = typeof(GameView).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.That(method, Is.Not.Null, $"Method '{methodName}' was not found on GameView.");
-            method.Invoke(view, args);
         }
 
         private static IEnumerator WaitForCondition(System.Func<bool> condition, int maxFrames, string failureMessage)
