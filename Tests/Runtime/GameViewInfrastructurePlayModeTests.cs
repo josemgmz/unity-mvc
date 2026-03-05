@@ -121,6 +121,29 @@ namespace UnityMVC.Tests.Runtime
         }
 
         [UnityTest]
+        public IEnumerator PlayModeControllerExecutionAttributeInitializesEligibleControllers()
+        {
+            var gameObject = new GameObject("playmode-execution-attribute");
+            try
+            {
+                var view = gameObject.AddComponent<PlayModeExecutionAttributeModesView>();
+
+                yield return null;
+
+                Assert.That(view.TryGetController<PlayModeAttributePlayOnlyController>(out _), Is.True);
+                Assert.That(view.TryGetController<PlayModeAttributeAlwaysController>(out _), Is.True);
+                Assert.That(view.TryGetController<PlayModeAttributeEditorOnlyController>(out _), Is.False);
+            }
+            finally
+            {
+                if (gameObject != null)
+                {
+                    Object.Destroy(gameObject);
+                }
+            }
+        }
+
+        [UnityTest]
         public IEnumerator PlayModeTryGetControllerReturnsFalseWhenViewHasNoControllers()
         {
             var gameObject = new GameObject("playmode-no-controllers");
@@ -1303,6 +1326,14 @@ namespace UnityMVC.Tests.Runtime
             [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecuteAlways] private PlayModeAlwaysController alwaysController;
         }
 
+        public class PlayModeExecutionAttributeModesView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PlayModeModel model;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecution(GameFieldAttributes.ControllerExecutionMode.PlayOnly)] private PlayModeAttributePlayOnlyController playOnlyController;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecution(GameFieldAttributes.ControllerExecutionMode.EditorOnly)] private PlayModeAttributeEditorOnlyController editorOnlyController;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecution(GameFieldAttributes.ControllerExecutionMode.Always)] private PlayModeAttributeAlwaysController alwaysController;
+        }
+
         public class PlayModeModelOnlyView : GameView
         {
             [SerializeField, GameFieldAttributes.ModelField] private PlayModeModel model;
@@ -1325,6 +1356,27 @@ namespace UnityMVC.Tests.Runtime
         public class PlayModeAlwaysController : GameController<PlayModeExecutionModesView>
         {
             public PlayModeAlwaysController()
+            {
+            }
+        }
+
+        public class PlayModeAttributePlayOnlyController : GameController<PlayModeExecutionAttributeModesView>
+        {
+            public PlayModeAttributePlayOnlyController()
+            {
+            }
+        }
+
+        public class PlayModeAttributeEditorOnlyController : GameController<PlayModeExecutionAttributeModesView>
+        {
+            public PlayModeAttributeEditorOnlyController()
+            {
+            }
+        }
+
+        public class PlayModeAttributeAlwaysController : GameController<PlayModeExecutionAttributeModesView>
+        {
+            public PlayModeAttributeAlwaysController()
             {
             }
         }

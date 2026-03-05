@@ -146,6 +146,31 @@ namespace UnityMVC.Tests.Editor
         }
 
         [Test]
+        public void ControllerExecutionAttributeRespectsModesInEditorInitializationPath()
+        {
+            var view = CreateComponent<EditorExecutionAttributeModesView>("editor-execution-attribute");
+
+            _callLog.Clear();
+            InvokeHidden(view, "OnDrawGizmos");
+
+            Assert.That(view.TryGetController<AttributeEditorOnlyController>(out _), Is.True);
+            Assert.That(view.TryGetController<AttributeAlwaysController>(out _), Is.True);
+            Assert.That(view.TryGetController<AttributePlayOnlyController>(out _), Is.False);
+        }
+
+        [Test]
+        public void ControllerFieldAttributeControlsControllerDiscovery()
+        {
+            var view = CreateComponent<ControllerFieldCoverageView>("controller-field-coverage");
+
+            _callLog.Clear();
+            InvokeHidden(view, "OnDrawGizmos");
+
+            Assert.That(view.TryGetController<FieldAttributedController>(out _), Is.True);
+            Assert.That(view.TryGetController<MissingFieldAttributeController>(out _), Is.False);
+        }
+
+        [Test]
         public void GameViewForwardsAllNonUiEventsToControllers()
         {
             var view = CreateComponent<AllEventsView>("all-events");
@@ -457,6 +482,28 @@ namespace UnityMVC.Tests.Editor
         public class PlayOnlyController : GameController<EditorExecutionModesView> { public PlayOnlyController() {} }
         public class EditorOnlyController : GameController<EditorExecutionModesView> { public EditorOnlyController() {} }
         public class AlwaysController : GameController<EditorExecutionModesView> { public AlwaysController() {} }
+
+        public class EditorExecutionAttributeModesView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PrimaryModel primaryModel;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecution(GameFieldAttributes.ControllerExecutionMode.PlayOnly)] private AttributePlayOnlyController playOnlyController;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecution(GameFieldAttributes.ControllerExecutionMode.EditorOnly)] private AttributeEditorOnlyController editorOnlyController;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecution(GameFieldAttributes.ControllerExecutionMode.Always)] private AttributeAlwaysController alwaysController;
+        }
+
+        public class AttributePlayOnlyController : GameController<EditorExecutionAttributeModesView> { public AttributePlayOnlyController() {} }
+        public class AttributeEditorOnlyController : GameController<EditorExecutionAttributeModesView> { public AttributeEditorOnlyController() {} }
+        public class AttributeAlwaysController : GameController<EditorExecutionAttributeModesView> { public AttributeAlwaysController() {} }
+
+        public class ControllerFieldCoverageView : GameView
+        {
+            [SerializeField, GameFieldAttributes.ModelField] private PrimaryModel primaryModel;
+            [GameFieldAttributes.ControllerField, GameFieldAttributes.ControllerExecuteAlways] private FieldAttributedController fieldAttributedController;
+            [GameFieldAttributes.ControllerExecuteAlways] private MissingFieldAttributeController missingFieldAttributeController;
+        }
+
+        public class FieldAttributedController : GameController<ControllerFieldCoverageView> { public FieldAttributedController() {} }
+        public class MissingFieldAttributeController : GameController<ControllerFieldCoverageView> { public MissingFieldAttributeController() {} }
 
         [Serializable]
         public class EventModel : GameModel
