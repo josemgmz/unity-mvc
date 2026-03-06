@@ -19,11 +19,9 @@
 - Do remember `GameView.GetModel<T>()` returns a clone; avoid mutating that clone expecting live state updates.
 - Do use `TryGetController` / `TryGetModel` for optional cross-object lookups.
 
-## Bus mistakes
+## Event bus mistakes
 
 - Do store delegates in fields when adding listeners, then remove the same delegate instance.
-- Do not rely on provider fan-out in data bus queries; only the first provider result is returned.
-- Do keep argument count and types aligned for `GetData<T>(...)`.
 - Do remove event listeners in `OnDestroy` unless owner-based lifetime handling is guaranteed by the project.
 
 ## Controller order and execution mode
@@ -34,4 +32,3 @@
   - `[GameFieldAttributes.ControllerExecutionAttribute(GameFieldAttributes.ControllerExecutionMode.PlayOnly)]`
   - `[GameFieldAttributes.ControllerEditorOnlyAttribute]`
   - `[GameFieldAttributes.ControllerExecuteAlwaysAttribute]`
-

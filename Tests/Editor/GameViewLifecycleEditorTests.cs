@@ -253,8 +253,16 @@ namespace UnityMVC.Tests.Editor
 
             Assert.That(exact, Is.Not.Null);
             Assert.That(view.GetController<ILookupMarker>(), Is.SameAs(exact));
+            Assert.That(view.gameObject.GetController<LookupController>(), Is.SameAs(exact));
+            Assert.That(view.gameObject.GetController(typeof(ILookupMarker)), Is.SameAs(exact));
             Assert.That(view.gameObject.TryGetController<LookupController>(out var fromGameObject), Is.True);
             Assert.That(fromGameObject, Is.SameAs(exact));
+
+            var collider = view.gameObject.AddComponent<BoxCollider>();
+            Assert.That(collider.GetController<LookupController>(), Is.SameAs(exact));
+            Assert.That(collider.GetController(typeof(ILookupMarker)), Is.SameAs(exact));
+            Assert.That(collider.TryGetController<LookupController>(out var fromCollider), Is.True);
+            Assert.That(fromCollider, Is.SameAs(exact));
 
             var model = view.GetModel<BaseLookupModel>();
             Assert.That(model, Is.TypeOf<DerivedLookupModel>());
